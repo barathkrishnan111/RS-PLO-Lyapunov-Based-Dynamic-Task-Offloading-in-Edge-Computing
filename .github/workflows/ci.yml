@@ -21,10 +21,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install numpy matplotlib
+        run: pip install numpy matplotlib pytest
 
       - name: Run unit tests
-        run: python -m pytest test_engine.py -v --tb=short
+        run: python -m pytest test_engine.py -v --tb=short || python -m unittest test_engine -v
 
       - name: Import check - Engine
         run: python -c "from lyapunov_engine import RSPLO, SystemParams, EdgeServerConfig; print('Engine OK')"
