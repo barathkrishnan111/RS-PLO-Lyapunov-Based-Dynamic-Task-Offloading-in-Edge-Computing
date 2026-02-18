@@ -1,0 +1,238 @@
+Lyapunov-Stable Dynamic Task Offloading in Non-Stationary Edge Environments: A Deterministic Drift-Plus-Penalty Framework
+
+
+Introduction
+
+
+The rapid development of the Internet of Things (IoT) and the forthcoming 5G and 6G Networks have encouraged researchers to shift their focus from centralized Cloud Computing to Mobile Edge Computing (MEC). Since MEC pushes computation further away from the control center and to the edge of the network, this allows for significant improvement of backhaul congestion and the overall latency decreases for critical applications like autonomous driving, augmented reality (AR) and smart city surveillance . However, the efficiency of MEC heavily depends on the Offloading Task Decision, which deals with the complexity of deciding whether to compute data on the IoT device or send it to the edge server, a decision which, when dealing with urban settings, is extremely difficult.
+
+One of the biggest challenges to MEC is the constantly changing nature of the edge environment. Because of user and vehicle mobility (particularly with rapid vehicle movement, such as taxis, for example) and the resulting shadowing and a phenomenon dubbed 'multipath fading,' the actual circumstantial factors of urban settings or vehicular network areas change frequently and can therefore create a situation of non-statiation when a high level of vehicle movement is present [2]. Also, there is the possibility of variables such as task arrival to be uneven and occur in sporadic bursts. Task arrival rates, for example, can occur in a 'bursty' rhythm.  In real life non-stationary environments, the use of static or non-changing assumptions can lead to severe degradation of the overall performance. This may be manifested as excessive energy waste or catastrophe. Queues may overflow due to this.
+
+There are two predominant methods being used to articulate dynamically offloaded tasks: Deep Reinforcement Learning (DRL) and Lyapunov Optimization. While method's based off of DRL have shown to be very versatile in being able to learn complex tasks without precursory knowledge of the given environment, the DRL methods do have major drawbacks in their inability to sufficiently converge, the exhibit a high count of samples to be taken before the method completes, and extremely high computational loads are required to run the methods, all of which make the methods extremely unsuited to the edge devices that have an operational deadline of a few milliseconds. In contrast to DRL based methods, Lyapunov optimization (specifically the Drift-Plus-Penalty method)  has provided a method that is deterministic with respect to it’s complexity and ensures the stability of the queue at hand. Irrespective of this, standard Lyapunov optimization methods provide an unchanging fundamental defect with respect to an arbitrary control mechanism, , which determines the optimum balance with respect to the minimization of the energy to be used and remaining stabilities of the queue.
+
+A large static  prioritizes energy efficiency but allows queues to grow large, risking stability during traffic bursts.
+A small static  ensures low latency but wastes energy during idle periods.
+
+In non-stationary environments, a static is "blind" to future risk. It cannot distinguish between a momentary channel dip and a sustained outage, leading to performance collapses when the environment shifts rapidly.
+
+As a response, we present a new framework called Risk-Sensitive Predictive Lyapunov Optimization (RS-PLO). While most previous works deal with genuine, physical queue backlogs, RS-PLO creates a “Virtual Volatility Queue” (), which is a mathematical construct that captures prediction mistakes regarding the environment. The queue serves as a sort of "real-time riskometer" for the system. When the system becomes volatile (e.g. a taxi enters the shadow of a traffic signal), the Volatility Queue increases, and as a result, there is a strict and deterministic reduction of the control parameter . This is designed such that the system is forced to at least temporarily prioritize stability over energy and “clear the decks” before pending control actions can backlog.
+
+We evaluate this framework with the help of the Microsoft T-Drive dataset, which includes real GPS trajectories for 10,357 taxis in Beijing. This dataset allows us to model realistic, non-stationary channel fading. To the best of our knowledge, this is the first attempt to incorporate a virtual volatility metric into the Lyapunov drift-plus-penalty mechanism of edge computing.
+The core innovations of this paper can be summarized as follows: 
+
+First, we present the Virtual Volatility Queue , a fundamental component of the Optimisation Framework. This allows us to decouple the “predictive volatility” component of the Virtual Volatility Queue from the “actual” physical traffic load.
+
+Second, we present Adaptive Drift-Plus-Penalty Control Law. In this case, we present a closed form, deterministic control law where the energy-delay trade-off parameter  is set to be inversely coupled to the Volatility Queue. This allows the system to autonomously be in “Energy Saving” or “High Reliability” depending on the mode of volatility.
+
+Last, we present a Trace-Driven Validation. Using the Microsoft T-Drive (Beijing) dataset, we show that in high volatility (traffic burst probability ) RS-PLO achieves, on average, 15-20% lower queue backlog compared to the static baselines while operating under similar energy consumption profiles.
+
+The rest of this paper is organized as follows: In Section II we describe the system model and the mobility patterns in the real world. Section III sets up the problem formulation for the stochastic optimization. In Section IV we describe the RS-PLO framework. In Section V we evaluate its performance using the Beijing T-Drive traces and in Section VI we summarize the work.
+
+LITERATURE REVIEW
+
+A. Lyapunov Based Task Offloading in Edge Computing 
+
+Due to the ability to guarantee long-term queue stability with the consideration of stochastic task arrivals and time-varying channels, the Lyapunov optimization technique has been implemented in mobile and edge computing systems. For example, in [1], Bi et al. proposed a framework guided by Lyapunov that reshapes long-term stochastic offloading problems into queue-stable, deterministic, per-slot optimization problems in order to maximize computation throughput. The same authors also proposed similar Lyapunov-based formulations in the context of MEC systems and, without knowledge of the system’s future, jointly optimized energy, delay, and stability of the system, as shown in [3]  and [7].
+
+B. Drift Plus Penalty (DPP) Frameworks for Non Stationary Scenarios
+
+The core of this optimization technique, and hence the central element of DPP, is the ability to specify queue backlog in contrast to a performance parameter. For example, in [2], Hu et al. used DPP in satellite edge computing to reduce delay and energy while preserving the stability of the queue. The DPP-based methods were shown to be effective even in dynamic and non-stationary edge systems in works by He et al. [4] and Bai et al. [19] in UAV-assisted vehicular and maritime IoT systems, respectively.
+
+C. Approaches to Deep Reinforcement Learning Guided by C. Lyapunov
+
+There is an emerging trend combining Lyapunov optimization and deep reinforcement learning (DRL) to manage the per-slot optimization problem's computational difficulty. While Bi et al. [1], Li et al. [5], and Feng et al. [6] utilized the Lyapunov optimization stabilizing queue to work with DRL to approximate the optimal decisions for offloading and caching, Qiao et al. [15], Wang et al. [25], and Xu et al. [27], incorporate advanced DRL variants like DDPG, TD3, and PPO, as well as multi-agent learning, to address large-scale and decentralized systems. These hybrid methods guarantee long-term stability, and are shown to have improved adaptability and scalability.
+
+D. Offloading with Stability Considerations in Specific Edge Contexts
+
+Task offloading based on Lyapunov's can be applied to situations outside the standard MEC. Balancing energy expenditure with queue stability in mobile crowdsensing is accomplished with Luan et al.'s [9] double queue Lyapunov formulation. The energy sustainability and reliability constraints in Lyapunov frameworks were incorporated by Zhong et al. [21] and Yao et al. [29] in satellite and UAV assistance systems. The work of Wu et al. [26] and Wang et al. [25] show Lyapunov optimization in decentralized offloading with a focus on privacy.
+
+E. Surveys and Identified Research Gaps
+
+Peng et al. [12], Cao et al. [13], and Verma et al. [20] recent surveys comprehensively review task offloading and cost optimization in edge computing. All three surveys recognize the increasing importance of Lyapunov optimization and DRL. However, they point out the fact that the majority of the current solutions still heavily rely on learning-based components that may bring along training overhead and convergence delay in addition to poor interpretability under rapidly changing environments.
+
+ F. Motivation of the Present Work
+
+Considering the above mentioned, this work is motivated by the above drawbacks and focuses on a deterministic Lyapunov drift-plus-penalty approach to dynamic task offloading in non-stationary edge environments in order to achieve satisfactory queue stability and a robust framework for low complexity online decision making that does not utilize reinforcement learning.
+
+
+System Model
+
+We analyze a multi-user Mobile Edge Computing (MEC) system in a dense urban area (Beijing city center) with highly mobile users and constantly changing channel conditions.
+
+A. Network Model and Actual Mobility Data
+
+The network includes  mobile users (e.g., smart taxis) represented as , and one MEC-integrated Base Station (BS). The system functions under discrete time intervals , with each interval lasting .
+
+For appropriate mobility simulation, we resort to the Microsoft T-Drive dataset , which includes the GPS data of 10,357 taxis in Beijing. In contrast to arbitrary Random Waypoint models, T-Drive records the intricate spatio-temporal patterns of urban traffic, such as congestion at crossings and high-speed travel on ring roads. We used the trajectories of $N$ users concerning a BS located at the center of Beijing (Lat: 39.9087, Lon: 116.3975).
+
+
+Fig. 1. System architecture of the proposed edge computing framework in a non-stationary urban environment. The system comprises mobile users (taxis) offloading tasks to an MEC server via time-varying wireless channels .
+
+User  and the BS have a distance  at time slot . This distance  determines the large-scale path loss. The time-varying channel gain ) is modeled as 
+
+
+
+where is the reference channel gain, \alpha is the path loss exponent (set to 3.5 for urban areas), and  is small-scale Rayleigh fading and has an exponential distribution with a mean of 1.
+
+
+Fig. 4. Based on the T-Drive data of Microsoft, the simulation environment has spatio-temporal characterizations. (a) Spatially, the distribution of taxis around the MEC server (red cross) of the city of Beijing. (b) The channel gain evolution  for one urban mobile user, which shows marked urban deep fading, as well as non-stationary fluctuations.
+
+B. Task Model and Physical Queue Dynamics
+At the beginning of each slot , user generates a computation task  (in bits). The user must decide whether to process the task locally or offload it to the MEC server. We define a binary decision variable , where  denotes offloading and  denotes local execution.
+The physical task queue  evolves according to the standard queuing equation:
+
+
+where  is the execution rate (bits/s), determined by:
+
+
+Here,  is the local CPU capability, and   is the wireless transmission rate derived from the Shannon capacity formula:
+
+
+where  is the bandwidth,  is the transmission power, and  is the noise power.
+C. Energy Consumption Model
+The total energy consumption  consists of either local computation energy or wireless transmission energy:
+
+
+where  is the effective switched capacitance coefficient of the local CPU.
+D. The Novelty: Virtual Volatility Queue
+A critical limitation of the standard model described above is that  only captures the current backlog, not the future risk of channel outage. To address this, we introduce a Virtual Volatility Queue .
+We define the channel prediction error  as the magnitude difference between the current channel state and a short-term predictor (e.g., previous state memory):
+
+
+The Volatility Queue evolves to accumulate these errors over time:
+
+
+where  is a tunable decay parameter representing the system's "risk tolerance."
+Significance: Unlike the physical queue  which stores data bits,  stores "uncertainty." A backlog in  indicates that the environment is currently highly volatile (non-stationary).
+METHODOLOGY: RISK-SENSITIVE PREDICTIVE LYAPUNOV OPTIMIZATION
+In this section, we develop the Risk-Sensitive Predictive Lyapunov Optimization (RS-PLO) framework. The core objective is to minimize the long-term average energy consumption of the MEC system while maintaining queue stability, even in the presence of non-stationary channel fluctuations.
+A. Problem Formulation
+Let  be the time-average energy consumption of the system and  be the time-average physical queue backlog for user . The stochastic optimization problem is formulated as:
+
+
+The first constraint ensures strong stability (finite latency), while the second enforces binary offloading decisions.
+B. The Virtual Volatility Queue
+Standard Lyapunov optimization uses a static penalty parameter , which fails to adapt to rapid environmental changes. To overcome this, we introduce the Virtual Volatility Queue . This queue acts as a memory buffer for "risk," accumulating channel prediction errors.
+Let  be the predicted channel gain at slot . We define the instantaneous prediction error  as:
+
+
+The Volatility Queue evolves as:
+
+
+where  is a constant service rate representing the system's capacity to absorb uncertainty. A high value of  indicates that the environment is currently volatile and the prediction model is unreliable.
+C. Lyapunov Drift-Plus-Penalty with Risk Bias
+We define a composite Lyapunov scalar function  that accounts for both the physical backlog and the environmental risk:
+
+
+where  and  are normalization weights.
+The one-step Lyapunov drift  is defined as the expected change in the Lyapunov function:
+
+
+where  represents the composite system state.
+To solve the optimization problem (8), we minimize the drift-plus-penalty expression:
+
+
+D. The Dynamic Risk-Sensitive Control Law
+The key innovation of RS-PLO is the Dynamic Control Parameter . Instead of a static , we modulate the weight of the energy penalty based on the state of the Volatility Queue . We propose an inverse-exponential coupling law:
+
+
+Logic: When the channel is stable (, and the system prioritizes energy minimization (similar to standard Lyapunov).
+Adaptation: When volatility spikes ( decays rapidly toward zero. This effectively removes the "penalty" for energy consumption, forcing the optimization to focus purely on minimizing drift (i.e., clearing the queue) to ensure stability.
+ is a sensitivity parameter tuning the aggressiveness of the response.
+E. The Deterministic Optimization Problem
+Substituting (14) into (13) and removing constant terms, the stochastic problem is transformed into a deterministic per-slot minimization problem. At each time slot , the edge orchestrator observes the state  and selects the optimal offloading vector  by minimizing:
+
+
+
+Since the users are independent, this problem can be decoupled and solved in parallel for each user  with  complexity, making it highly scalable for dense edge networks.
+F. Algorithm Complexity Analysis
+The proposed RS-PLO algorithm operates with linear complexity.
+State Observation:  to read queues and channel states.
+Parameter Update:  to update  and compute .
+Decision Making:  since the optimization in (15) is decoupled per user.
+Total Complexity:  per time slot.
+This contrasts significantly with Deep Reinforcement Learning (DRL) approaches, which typically require  for inference and extensive offline training.
+Fig. 2. Operational flowchart of the Risk-Sensitive Predictive Lyapunov Optimization (RS-PLO) framework. The workflow illustrates the interaction between the physical task queue  and the virtual volatility queue .
+Fig. 3. Temporal structure of a single time slot . Sequence: (1) Observation; (2) Volatility estimation; (3) Optimization; (4) Action execution.
+IV. PERFORMANCE EVALUATION
+
+In this part, we discuss the performance evaluation of the RS-PLO framework using traction of mobility data. We show the performance of our approach against standard baselines to show improvement in stability and robustness of our approach in non-stationary edge environments.
+
+A. Experimental SetupMicrosoft T-Drive dataset is used. This is a dataset containing the GPS tracks of 10,357 taxis in Beijing. We try to develop a more realistic MEC scenario, so we only use the GPS tracks of  randomly selected taxis made over a time period of  time slots (1 time slot = 1 second). The MEC server is located in the center of Beijing. The wireless channel is modeled using a path loss  and Rayleigh fading.
+
+The simulation parameters are present in Table I.
+
+
+B. Environment Characterization
+To validate the non-stationarity of the environment, we analyze the spatial and temporal characteristics of the selected users.
+Fig. 4. Spatio-temporal characterization of the simulation environment based on Microsoft T-Drive traces. (a) Spatial distribution of taxi trajectories in the Beijing urban area relative to the MEC server (red cross). (b) The resulting channel gain evolution  for a selected user, exhibiting deep fades (magnitude ) and rapid fluctuations that challenge static optimization methods.
+Temporal Dynamics and Risk Adaptation
+
+We begin by assessing each individual step of the RS-PLO algorithm to confirm the validity of its "Risk Sympathetic" mechanism.
+
+ Fig5. Evolution over time of the state variable of the system under the RS-PLO mechanism description.
+
+(Top) Physical Queue :  The task backlog remains bounded throughout the course of the simulation and peaks dissipate quickly.  This confirms the algorithm meets the strong stability requirement.
+
+(Middle) The Volatility Queue : There is a noticeable “risk spike” at  where the quality of the channel went down in an undesirable way (error in prediction)
+
+(Bottom) The Control Parameter  :  The algorithm demonstrates an immediate opposite reaction. ) at  drops  .
+
+Analysis: This description confirms the principal novelty of my hypothesis. Differently from static methods which would disregard the channel degradation at t = 75 time, RS-PLO picks up the volatility accumulating in  and independently decreases the weight of the energy penalty. In that way, the system prioritizes “Clearing the Queue” over “Saving Energy” thereby averting an imminent system collapse.
+
+Efficiency Analysis (Energy-Latency Trade-off)
+
+We look at the energy-latency trade-off of RS-PLO against a Standard Lyapunov baseline (where V is static). The trade-off curves are made by sweeping the control parameter  (and ) from .
+
+ Fig. 6. Energy-Latency Pareto frontier comparison.
+
+Horizontal axis is average energy consumption, vertical axis is average queue backlog (proxy for latency).
+
+The Standard Lyapunov curve (Dashed Grey) is always to the right of the RS-PLO curve (Solid Blue).
+
+Quantitative Gain: Given an energy budget of 0.4 J/slot, RS-PLO is approximately 15-20% more latency efficient. The added efficiency comes from RS-PLO not doing "panic offloading" during deep fades and instead taking advantage of stable periods, more.
+
+Non-Stationarity Robustness  
+
+The last robustness analysis examines the impact on the framework’s performance as the Traffic Burst Probability is adjusted between 0.05 and 0.40. Higher values are suggestive of a more volatile, non-stationary environment.
+
+ Fig. 7. Robustness analysis considering increasing traffic burst probability.
+
+Baseline Failure: Standard Lyapunov approach (Red Dashed) is increasingly backlog divergent as more is added to the volatility.  is static and inability to adjust to bursts results in backlog.
+
+RS-PLO Stability: Proposed RS-PLO (Green Solid) is the only one maintaining a relatively flat backlog profile even at 40% probability.
+
+Performance Gap: At most volatile level (0.40), RS-PLO systematically backlog the most as opposed to the baseline. This shows that the variable  is adequate value for stabilizing the adverse effect of environment.
+
+REFERENCES
+[1] L. Bi, L. Huang, H. Wang, and Y.-J. A. Zhang, “Lyapunov-Guided Deep Reinforcement Learning for Stable Online Computation Offloading in Mobile-Edge Computing Networks,” IEEE Transactions on Wireless Communications, vol. 20, no. 11, pp. 7519–7537, Nov. 2021, doi: 10.1109/TWC.2021.3085319.
+[2] Y. Hu, W. Gong, and F. Zhou, “A Lyapunov-Optimized Dynamic Task Offloading Strategy for Satellite Edge Computing,” Applied Sciences, vol. 13, no. 7, Art. no. 4281, 2023, doi: 10.3390/app13074281.
+[3] X. Zhao, M. Li, and P. Yuan, “An Online Energy-Saving Offloading Algorithm in Mobile Edge Computing With Lyapunov Optimization,” Ad Hoc Networks, vol. 163, Art. no. 103580, 2024, doi: 10.1016/j.adhoc.2024.103580.
+[4] X. He, Y. Ni, and H. Tao, “Lyapunov-Based Queue Stability Optimization for Task Offloading in UAV-Assisted Vehicular Edge Computing,” Pervasive and Mobile Computing, vol. 115, Art. no. 102126, 2026, doi: 10.1016/j.pmcj.2025.102126.
+[5] N. Li, L. Zhai, Z. Ma, X. Zhu, and Y. Li, “Lyapunov-Guided Deep Reinforcement Learning for Service Caching and Task Offloading in Mobile Edge Computing,” Computer Networks, vol. 250, Art. no. 110593, 2024, doi: 10.1016/j.comnet.2024.110593.
+[6] X. Feng, C. Xu, X. Jin, C. Xia, and J. Jiang, “Intelligent End-Edge Computation Offloading Based on Lyapunov-Guided Deep Reinforcement Learning,” Applied Sciences, vol. 14, no. 23, Art. no. 11160, 2024, doi: 10.3390/app142311160.
+[7] Y. Li, S. Cheng, H. Zhang, and J. Liu, “Dynamic Adaptive Workload Offloading Strategy in Mobile Edge Computing Networks,” Computer Networks, vol. 233, Art. no. 109878, 2023, doi: 10.1016/j.comnet.2023.109878.
+[8] G. Nieto, I. de la Iglesia, U. Lopez-Novoa, et al., “Deep Reinforcement Learning Techniques for Dynamic Task Offloading in the 5G Edge–Cloud Continuum,” Journal of Cloud Computing, vol. 13, Art. no. 94, 2024, doi: 10.1186/s13677-024-00658-0.
+[9] D. Luan, W. Wang, W. Liu, Y. Yang, and J. Deng, “Stability-Aware Data Offloading Optimization in Edge-Based Mobile Crowdsensing,” Frontiers of Computer Science, vol. 19, Art. no. 1911503, 2025, doi: 10.1007/s11704-024-40620-6.
+[10] T. Zheng, J. Wan, J. Zhang, et al., “Deep Reinforcement Learning-Based Workload Scheduling for Edge Computing,” Journal of Cloud Computing, vol. 11, Art. no. 3, 2022, doi: 10.1186/s13677-021-00276-0.
+[11] Y. Wang and S. Sun, “Dynamic Task Scheduling in Wireless Edge Computing Using Deep Reinforcement Learning With Ordinal Optimization,” EURASIP Journal on Wireless Communications and Networking, Art. no. 96, 2025, doi: 10.1186/s13638-025-02534-0.
+[12] P. Peng, W. Lin, W. Wu, H. Zhang, S. Peng, Q. Wu, and K. Li, “A Survey on Computation Offloading in Edge Systems: From the Perspective of Deep Reinforcement Learning Approaches,” Computer Science Review, vol. 53, Art. no. 100656, 2024, doi: 10.1016/j.cosrev.2024.100656.
+[13] L. Cao, T. Huo, S. Li, et al., “Cost Optimization in Edge Computing: A Survey,” Artificial Intelligence Review, vol. 57, Art. no. 312, 2024, doi: 10.1007/s10462-024-10947-4.
+[14] C. Gao, C. Zhang, and J. Wang, “Joint DNN Partitioning and Multi-User Task Offloading in Multi-Server MEC Systems via Lyapunov Optimization,” in Proc. IEEE Int. Symp. Broadband Multimedia Systems and Broadcasting (BMSB), Dublin, Ireland, 2025, pp. 1–5, doi: 10.1109/BMSB65076.2025.11165707.
+[15] X. Qiao and Y. Zhou, “Task Offloading of Edge Computing Network Based on Lyapunov and Deep Reinforcement Learning,” in Proc. 9th Int. Conf. Computer and Communication Systems (ICCCS), Xi’an, China, 2024, pp. 1054–1059, doi: 10.1109/ICCCS61882.2024.10603075.
+[16] M. Hoque and K. Kovuri, “Time and Energy Trade-Offs for Mobile Edge Computing: A Comparative Study of Task Offloading Strategies,” in Proc. ICAET, Pune, India, 2025, pp. 1–5, doi: 10.1109/ICAET63349.2025.10932256.
+[17] J. Liang and X. Xie, “Optimization of Task Offloading Strategy Based on Lyapunov and Deep Reinforcement Learning in Multi-MEC Systems,” in Proc. IJCNN, Rome, Italy, 2025, pp. 1–8, doi: 10.1109/IJCNN64981.2025.11228743.
+[18] T. Yamada, T. Hara, and S. Kasahara, “Repeated Stochastic Game and Lyapunov Optimization for Mining Task Offloading in Decentralized Applications,” IEICE Transactions on Communications, vol. E107-B, no. 12, pp. 936–944, Dec. 2024, doi: 10.23919/transcom.2024CEP0001.
+[19] J. Bai and Y. Zhang, “Dynamic Offloading Based on Lyapunov Optimization for UAV-Assisted Maritime IoT-MEC Networks,” IEEE Transactions on Vehicular Technology, vol. 74, no. 11, pp. 17894–17906, Nov. 2025, doi: 10.1109/TVT.2025.3576090.
+[20] V. R. Verma, P. Kumar, and B. Pushkar, “An Extensive Investigation on Lyapunov Optimization-Based Task Offloading Techniques in Multi-Access Edge Computing,” SN Computer Science, vol. 6, Art. no. 603, 2025, doi: 10.1007/s42979-025-04130-x.
+[21] S. Zhong, D. Tian, D. Zeng, Z. Qu, and C. Hu, “Battery Lifetime Extension in Heterogeneous Satellite Edge Computing: A Lyapunov-DRL Approach,” IEEE Internet of Things Journal, 2026, doi: 10.1109/JIOT.2026.3658536.
+[22] S. Sohn, S. Kim, and H.-W. Lee, “Joint Frame Drop and Object Detection Task Offloading for Mobile Devices via Reinforcement Learning With Lyapunov Optimization,” IEEE Transactions on Mobile Computing, vol. 24, no. 7, pp. 6168–6182, Jul. 2025, doi: 10.1109/TMC.2025.3539356.
+[23] W. Wang et al., “LADO: Lyapunov-ADMM Optimization for Task Scheduling and Resource Allocation in Edge Computing,” in Proc. IEEE/CIC ICCC Workshops, Shanghai, China, 2025, pp. 1–6, doi: 10.1109/ICCCWorkshops67136.2025.11148221.
+[24] M. Armoush et al., “Optimizing UAV Task Processing in Disaster Response With Lyapunov-Based Edge Computing,” in Proc. IEEE HONET, Doha, Qatar, 2024, pp. 61–66, doi: 10.1109/HONET63146.2024.10822891.
+[25] H. Wang et al., “Lyapunov-Assisted Decentralized Dynamic Offloading Strategy Based on Deep Reinforcement Learning,” IEEE Internet of Things Journal, vol. 12, no. 7, pp. 8368–8380, Apr. 2025, doi: 10.1109/JIOT.2024.3498839.
+[26] Y. Wu et al., “Combining Lyapunov Optimization With Actor–Critic Networks for Privacy-Aware IIoT Computation Offloading,” IEEE Internet of Things Journal, vol. 11, no. 10, pp. 17437–17452, May 2024, doi: 10.1109/JIOT.2024.3357110.
+[27] P. Xu, C. Zhang, and H. Yu, “Lyapunov-Guided Resource Allocation and Task Scheduling for Edge Computing Cognitive Radio Networks via Deep Reinforcement Learning,” IEEE Sensors Journal, vol. 25, no. 7, pp. 12253–12264, Apr. 2025, doi: 10.1109/JSEN.2025.3542972.
+[28] W. Zhao et al., “DRL Connects Lyapunov in Delay and Stability Optimization for Offloading Proactive Sensing Tasks of RSUs,” IEEE Transactions on Mobile Computing, vol. 23, no. 7, pp. 7969–7982, Jul. 2024, doi: 10.1109/TMC.2023.3342102.
+[29] J. Yao, S. Cal, and X. Sun, “Reliability-Aware Offloading in UAV-Aided Mobile Edge Network by Lyapunov Optimization,” in Proc. IEEE ICNC, Big Island, HI, USA, 2024, pp. 856–861, doi: 10.1109/ICNC59896.2024.10556167.
+[30] G. Mufti et al., “Intelligent Computational Offloading Using Lyapunov Optimization and Deep Reinforcement Learning,” in Proc. IEEE CAMAD, Athens, Greece, 2024, pp. 1–6, doi: 10.1109/CAMAD62243.2024.10942915.
+
