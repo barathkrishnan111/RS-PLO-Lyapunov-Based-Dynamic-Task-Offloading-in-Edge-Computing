@@ -21,8 +21,9 @@ Based on the paper: *"Lyapunov-Stable Dynamic Task Offloading in Non-Stationary 
   - [Standalone Edge Server](#3-standalone-edge-server)
 - [Supported Task Types](#supported-task-types)
 - [System Parameters](#system-parameters)
-- [Results & Analysis](#results--analysis)
+- [Results and Analysis](#results-and-analysis)
 - [How the Decision Works](#how-the-decision-works)
+- [Technical Details](#technical-details)
 
 ---
 
@@ -47,18 +48,18 @@ The challenge: **wireless channels are unpredictable**. A good channel can sudde
 ## Architecture
 
 ```
-┌──────────────────────┐         TCP Socket          ┌──────────────────────┐
-│   IoT Device (You)   │ ──── Offload Tasks ────→    │   Edge Server (MEC)  │
-│                      │                              │                      │
-│  • RS-PLO Engine     │         OR                   │  • Matrix Multiply   │
-│  • Queue Manager     │                              │  • SHA-256 Hashing   │
-│  • Channel Monitor   │  ←── Execute Locally         │  • Prime Factorize   │
-│  • Decision Maker    │                              │  • Word Count        │
-│                      │  ←── Return Results ────     │  • File Analysis     │
-└──────────────────────┘                              │  • Text Encryption   │
-   lyapunov_engine.py                                 │  • Number Sorting    │
-   demo.py                                            └──────────────────────┘
-                                                         edge_server.py
++------------------------+         TCP Socket          +------------------------+
+|   IoT Device (You)     | ---- Offload Tasks ---->   |   Edge Server (MEC)    |
+|                        |                              |                        |
+|  - RS-PLO Engine       |         OR                   |  - Matrix Multiply     |
+|  - Queue Manager       |                              |  - SHA-256 Hashing     |
+|  - Channel Monitor     |  <--- Execute Locally        |  - Prime Factorize     |
+|  - Decision Maker      |                              |  - Word Count          |
+|                        |  <--- Return Results ----    |  - File Analysis       |
++------------------------+                              |  - Text Encryption     |
+   lyapunov_engine.py                                   |  - Number Sorting      |
+   demo.py                                              +------------------------+
+                                                           edge_server.py
 ```
 
 **Key point:** The edge server runs as a **separate process** on `127.0.0.1:9999`. Tasks are sent over **real TCP sockets** with a length-prefixed JSON protocol. This mirrors how real MEC offloading works.
@@ -72,20 +73,20 @@ The challenge: **wireless channels are unpredictable**. A good channel can sudde
 ```
                     Channel Prediction
                     Error e(t)
-                         │
-                         ▼
-  Tasks ──→ [ Physical Queue Q(t) ]      [ Volatility Queue Z(t) ] ──→ V(t) = V_max · e^(-β·Z)
-              │                              │
-              │  Q grows when               │  Z grows when channel
-              │  tasks arrive faster         │  is unpredictable
-              │  than they're served         │
-              ▼                              ▼
+                         |
+                         v
+  Tasks --> [ Physical Queue Q(t) ]      [ Volatility Queue Z(t) ] --> V(t) = V_max * e^(-B*Z)
+              |                              |
+              |  Q grows when               |  Z grows when channel
+              |  tasks arrive faster         |  is unpredictable
+              |  than they're served         |
+              v                              v
          Drift Term                     Penalty Term
-         Q(t)·(A - μ)                   V(t) · E(t)
-              │                              │
-              └──────── Cost Function ───────┘
-                         │
-                         ▼
+         Q(t)*(A - u)                   V(t) * E(t)
+              |                              |
+              +--------- Cost Function ------+
+                         |
+                         v
                    DECISION: LOCAL or OFFLOAD
                    (pick the lower cost)
 ```
@@ -95,28 +96,29 @@ The challenge: **wireless channels are unpredictable**. A good channel can sudde
 **Per-slot optimization — minimize:**
 
 ```
-Cost(x) = Q(t) · [A(t) - μ_x(t)]  +  V(t) · E_x(t)
-           ├──── Drift Term ────┤     ├── Penalty ──┤
+Cost(x) = Q(t) * [A(t) - u_x(t)]  +  V(t) * E_x(t)
+           |---- Drift Term ----|     |-- Penalty --|
            Queue growth pressure      Energy cost
 ```
 
 Where:
+
 | Symbol | Description |
 |--------|-------------|
 | `Q(t)` | Physical queue backlog (bits) — how many tasks are waiting |
 | `A(t)` | Task arrival (bits this slot) |
-| `μ_x(t)` | Service rate — local CPU (10 MHz) or wireless TX rate |
-| `V(t)` | Adaptive control = `V_max · exp(-β · Z(t))` |
+| `u_x(t)` | Service rate — local CPU (10 MHz) or wireless TX rate |
+| `V(t)` | Adaptive control = `V_max * exp(-beta * Z(t))` |
 | `E_x(t)` | Energy cost of executing locally or offloading |
-| `Z(t)` | Volatility queue = `max(Z(t-1) - γ, 0) + e(t)` |
+| `Z(t)` | Volatility queue = `max(Z(t-1) - gamma, 0) + e(t)` |
 | `e(t)` | Channel prediction error (dB scale) |
 
 ### Key Behavior
 
 | Condition | Z(t) | V(t) | System Behavior |
 |-----------|:-----:|:-----:|-----------------|
-| Stable channel | Low | **High** | Energy penalty dominates → choose cheaper energy option |
-| Volatile channel | High | **Low** | Drift dominates → choose fastest service rate (clear queue) |
+| Stable channel | Low | **High** | Energy penalty dominates, choose cheaper energy option |
+| Volatile channel | High | **Low** | Drift dominates, choose fastest service rate (clear queue) |
 | Full queue + good channel | High Q | Any | Offload to edge (higher service rate) |
 | Full queue + bad channel | High Q | Low | Execute locally (edge too slow over bad channel) |
 
@@ -125,17 +127,17 @@ Where:
 ## Project Structure
 
 ```
-e:\FP\
-├── edge_server.py          # TCP edge server — executes real computation tasks
-├── lyapunov_engine.py      # RS-PLO algorithm engine + static baseline
-├── demo.py                 # Live interactive CLI — process YOUR data in real-time
-├── run_experiment.py       # Automated experiment — RS-PLO vs Static comparison
-├── README.md               # This file
-├── paper_text.txt          # Extracted paper text
-└── results/                # Generated comparison plots
-    ├── 01_rsplo_mechanism.png
-    ├── 02_comparison.png
-    └── 03_summary.png
+FP/
+|-- edge_server.py          # TCP edge server - executes real computation tasks
+|-- lyapunov_engine.py      # RS-PLO algorithm engine + static baseline
+|-- demo.py                 # Live interactive CLI - process YOUR data in real-time
+|-- run_experiment.py       # Automated experiment - RS-PLO vs Static comparison
+|-- README.md               # This file
+|-- paper_text.txt          # Extracted paper text
++-- results/                # Generated comparison plots
+    |-- 01_rsplo_mechanism.png
+    |-- 02_comparison.png
+    +-- 03_summary.png
 ```
 
 ### File Details
@@ -160,8 +162,9 @@ e:\FP\
 ### Setup
 
 ```bash
-# 1. Navigate to the project
-cd e:\FP
+# 1. Clone the repo
+git clone https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing.git
+cd RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing
 
 # 2. Install dependencies
 pip install numpy matplotlib
@@ -184,7 +187,7 @@ python demo.py
 #### Compute Tasks
 
 ```
-rsplo> matrix 100          # Multiply two 100×100 matrices
+rsplo> matrix 100          # Multiply two 100x100 matrices
 rsplo> hash 500            # SHA-256 hash 500KB of data
 rsplo> prime 9999991       # Factorize a large number
 rsplo> sort 100000         # Sort 100,000 random numbers
@@ -194,8 +197,8 @@ rsplo> encrypt Hello World # Caesar cipher encrypt text
 #### Process Your Own Files
 
 ```
-rsplo> file e:\FP\paper_text.txt    # Word count + entropy analysis
-rsplo> hashfile C:\mydata\report.pdf # SHA-256 hash any file
+rsplo> file path/to/your/file.txt    # Word count + entropy analysis
+rsplo> hashfile path/to/any/file     # SHA-256 hash any file
 ```
 
 #### Change Network Conditions (live!)
@@ -221,30 +224,30 @@ rsplo> quit                # Exit
 
 ```
 rsplo> matrix 100
-  ┌─── Task #1: Matrix 100x100 ───
-  │  Channel: -89.5dB | Distance: 300m | TX Rate: 27.2 Mbps
-  │  Q=0 | Z=0.000 | V=10.0000
-  │  Decision: ⚡ OFFLOAD → Edge Server
-  │  ✓ Done! Executed on EDGE in 21.16ms
+  +--- Task #1: Matrix 100x100 ---
+  |  Channel: -89.5dB | Distance: 300m | TX Rate: 27.2 Mbps
+  |  Q=0 | Z=0.000 | V=10.0000
+  |  Decision: OFFLOAD -> Edge Server
+  |  Done! Executed on EDGE in 21.16ms
 
 rsplo> tunnel
-  🚇 ENTERED TUNNEL — Very weak signal! Distance: 2400m
+  ENTERED TUNNEL - Very weak signal! Distance: 2400m
 
 rsplo> encrypt Secret message
-  ┌─── Task #2: Encrypt text (14 chars) ───
-  │  Channel: -118.9dB | Distance: 2400m | TX Rate: 0.1 Mbps
-  │  Q=640,000 | Z=6.442 | V=0.0000
-  │  Decision: 🏠 LOCAL → This Device
-  │  ✓ Done! Executed on LOCAL in 0.00ms
+  +--- Task #2: Encrypt text (14 chars) ---
+  |  Channel: -118.9dB | Distance: 2400m | TX Rate: 0.1 Mbps
+  |  Q=640,000 | Z=6.442 | V=0.0000
+  |  Decision: LOCAL -> This Device
+  |  Done! Executed on LOCAL in 0.00ms
 
 rsplo> move close
-  📡 Moved CLOSE to edge server: 100m (excellent signal)
+  Moved CLOSE to edge server: 100m (excellent signal)
 
 rsplo> matrix 80
-  ┌─── Task #3: Matrix 80x80 ───
-  │  Channel: -84.1dB | Distance: 100m | TX Rate: 43.5 Mbps
-  │  Decision: ⚡ OFFLOAD → Edge Server
-  │  ✓ Done! Executed on EDGE in 1.14ms
+  +--- Task #3: Matrix 80x80 ---
+  |  Channel: -84.1dB | Distance: 100m | TX Rate: 43.5 Mbps
+  |  Decision: OFFLOAD -> Edge Server
+  |  Done! Executed on EDGE in 1.14ms
 ```
 
 Notice how the **same task type** gets different decisions based on channel conditions!
@@ -270,7 +273,7 @@ python run_experiment.py
 
 | Plot | Shows |
 |------|-------|
-| `01_rsplo_mechanism.png` | Q(t), Z(t), V(t) over time — the adaptive mechanism |
+| `01_rsplo_mechanism.png` | Q(t), Z(t), V(t) over time - the adaptive mechanism |
 | `02_comparison.png` | RS-PLO vs Static: queue, energy, offload pattern, latency |
 | `03_summary.png` | Per-user comparison and overall metrics |
 
@@ -311,13 +314,13 @@ sock.close()
 
 | Task Type | Command | What It Computes | Data Size |
 |-----------|---------|-----------------|-----------|
-| `matrix_multiply` | `matrix <N>` | N×N matrix multiplication (real NumPy `dot`) | N²×64 bits |
-| `hash_data` | `hash <KB>` | SHA-256 with 100 chained rounds | KB×8000 bits |
-| `prime_factorize` | `prime <N>` | Trial-division prime factorization | ~20K bits |
-| `sort_numbers` | `sort <count>` | Sort N random numbers | N×64 bits |
-| `text_encrypt` | `encrypt <text>` | Caesar cipher + SHA-256 hash | len×8 bits |
-| `word_count` | `file <path>` | Word/line/char count + frequency | file size |
-| `file_stats` | `file <path>` | Shannon entropy + pattern analysis | file size |
+| `matrix_multiply` | `matrix N` | NxN matrix multiplication (real NumPy dot) | N^2 x 64 bits |
+| `hash_data` | `hash KB` | SHA-256 with 100 chained rounds | KB x 8000 bits |
+| `prime_factorize` | `prime N` | Trial-division prime factorization | ~20K bits |
+| `sort_numbers` | `sort count` | Sort N random numbers | N x 64 bits |
+| `text_encrypt` | `encrypt text` | Caesar cipher + SHA-256 hash | len x 8 bits |
+| `word_count` | `file path` | Word/line/char count + frequency | file size |
+| `file_stats` | `file path` | Shannon entropy + pattern analysis | file size |
 
 All tasks are **real computation** — actual matrix products, actual hashing, actual factorization.
 
@@ -342,16 +345,16 @@ Configurable in `lyapunov_engine.py` (`SystemParams` class) or in `run_experimen
 | `f_local` | 10 MHz | Local IoT CPU frequency (microcontroller) |
 | `f_edge` | 5 GHz | Edge server CPU frequency |
 | `P_tx` | 0.5 W | Wireless transmission power |
-| `local_energy_per_bit` | 5×10⁻⁶ J/bit | Local computation energy cost |
+| `local_energy_per_bit` | 5e-6 J/bit | Local computation energy cost |
 
 ### Channel Parameters
 
 | Parameter | Default | Description |
 |-----------|:-------:|-------------|
-| `h0` | 10⁻² | Reference channel gain at 1m |
+| `h0` | 1e-2 | Reference channel gain at 1m |
 | `alpha` | 3.0 | Path loss exponent (urban micro-cell) |
 | `bandwidth` | 10 MHz | Wireless channel bandwidth |
-| `noise_power` | 10⁻¹⁰ | Noise power spectral density |
+| `noise_power` | 1e-10 | Noise power spectral density |
 
 ### Scenario Presets
 
@@ -374,13 +377,13 @@ params = SystemParams(V_max=2.0)   # prioritize queue clearing
 
 ---
 
-## Results & Analysis
+## Results and Analysis
 
 ### RS-PLO vs Static Lyapunov
 
 | Metric | RS-PLO | Static | Difference |
 |--------|:------:|:------:|:----------:|
-| Avg Latency | 0.26 ms | 0.31 ms | **+15.3% better** |
+| Avg Latency | 0.26 ms | 0.31 ms | **15.3% better** |
 | Offload Ratio | 4.3% | 8.0% | RS-PLO is more selective |
 | Total Energy | 1805 J | 1663 J | Static saves energy blindly |
 | Avg Queue | 37.85M bits | 37.85M bits | Comparable stability |
@@ -390,8 +393,8 @@ params = SystemParams(V_max=2.0)   # prioritize queue clearing
 ### How V(t) Adapts
 
 ```
-Time →    Stable Channel    |    Tunnel Event    |    Recovery
-          ─────────────────────────────────────────────────────
+Time -->  Stable Channel    |    Tunnel Event    |    Recovery
+          ----------------------------------------------------------
 Z(t):     0.0  0.1  0.2    |   5.0  8.0  12.0  |   11.8  11.6
 V(t):     10.0  9.8  9.6   |   0.0  0.0  0.0   |   0.0   0.0
 Mode:     Energy-optimize   |   Queue-stabilize  |   Recovering
@@ -406,17 +409,17 @@ When Z(t) is high, V(t) drops to near-zero, making the system ignore energy cost
 For each incoming task, the algorithm computes:
 
 ```
-Cost_local   = Q_norm × drift_local   + V(t) × penalty_local
-Cost_offload = Q_norm × drift_offload + V(t) × penalty_offload
+Cost_local   = Q_norm x drift_local   + V(t) x penalty_local
+Cost_offload = Q_norm x drift_offload + V(t) x penalty_offload
 ```
 
 **Pick the option with lower cost.**
 
 The drift captures **queue pressure** (how fast each option clears the queue), and the penalty captures **energy cost**. V(t) controls the balance:
 
-- **V = 10** (stable): Energy matters a lot → pick the cheaper option
-- **V = 0** (volatile): Energy doesn't matter → pick the fastest option
-- **Large Q**: Queue pressure dominates regardless → drain the queue
+- **V = 10** (stable): Energy matters a lot - pick the cheaper option
+- **V = 0** (volatile): Energy does not matter - pick the fastest option
+- **Large Q**: Queue pressure dominates regardless - drain the queue
 
 This creates an **intelligent, adaptive** offloading policy that responds to real-time conditions — exactly what the paper proposes.
 
@@ -425,8 +428,8 @@ This creates an **intelligent, adaptive** offloading policy that responds to rea
 ## Technical Details
 
 ### Channel Model
-- Path loss: `h(d) = h₀ · d^(-α)` with Rayleigh fading
-- Shannon capacity: `R = B · log₂(1 + P·h/N₀)`
+- Path loss: `h(d) = h0 * d^(-alpha)` with Rayleigh fading
+- Shannon capacity: `R = B * log2(1 + P*h/N0)`
 - Prediction error computed in **dB scale** for meaningful volatility tracking
 
 ### Communication Protocol
@@ -435,8 +438,8 @@ This creates an **intelligent, adaptive** offloading policy that responds to rea
 - Automatic fallback to local execution if edge connection fails
 
 ### Energy Model
-- Local: `E_local = energy_per_bit × task_bits` (slow CPU = more energy per bit)
-- Offload: `E_offload = P_tx × (task_bits / R)` (depends on channel quality)
+- Local: `E_local = energy_per_bit * task_bits` (slow CPU = more energy per bit)
+- Offload: `E_offload = P_tx * (task_bits / R)` (depends on channel quality)
 - When channel is good: offload is cheaper. When bad: local is cheaper.
 
 ---
@@ -444,5 +447,3 @@ This creates an **intelligent, adaptive** offloading policy that responds to rea
 ## License
 
 Academic/research use. Based on the RS-PLO framework from the referenced paper.
-#   R S - P L O - L y a p u n o v - B a s e d - D y n a m i c - T a s k - O f f l o a d i n g - i n - E d g e - C o m p u t i n g  
- 
