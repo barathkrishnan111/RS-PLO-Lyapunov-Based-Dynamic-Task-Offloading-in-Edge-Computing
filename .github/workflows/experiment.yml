@@ -1,0 +1,54 @@
+name: Run Experiment & Generate Paper Results
+
+on:
+  workflow_dispatch:
+    inputs:
+      time_slots:
+        description: 'Number of time slots per scenario'
+        required: false
+        default: '200'
+
+jobs:
+  experiment:
+    name: Run Full Experiment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install numpy matplotlib
+
+      - name: Run RS-PLO Experiment
+        run: python run_experiment.py
+        env:
+          MPLBACKEND: Agg
+
+      - name: Run Paper-Style Results
+        run: python generate_results.py
+        env:
+          MPLBACKEND: Agg
+
+      - name: Upload experiment results
+        uses: actions/upload-artifact@v4
+        with:
+          name: experiment-results
+          path: results/
+          retention-days: 30
+
+      - name: Show results summary
+        run: |
+          echo "=== Experiment Results ==="
+          ls -la results/
+          echo "=== Files generated ==="
+          echo "01_rsplo_mechanism.png"
+          echo "02_comparison.png"
+          echo "03_summary.png"
+          echo "04_paper_comparison.png"
