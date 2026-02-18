@@ -1,8 +1,13 @@
 # RS-PLO: Lyapunov-Based Dynamic Task Offloading in Edge Computing
 
-> **Real-time, risk-sensitive task offloading using Lyapunov optimization -- not a simulation, actual computation.**
+> **Real-time, risk-sensitive task offloading using Lyapunov optimization — not a simulation, actual computation.**
 
-This project implements the **RS-PLO (Risk-Sensitive Predictive Lyapunov Optimization)** framework for dynamic task offloading in Mobile Edge Computing (MEC) environments. Every task is **actually executed** -- either on your local device or offloaded to one of **3 real TCP edge servers** at different distances.
+[![CI - Tests](https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/actions/workflows/ci.yml/badge.svg)](https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/actions/workflows/ci.yml)
+[![Deploy Pages](https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/actions/workflows/deploy-pages.yml)
+
+**🌐 Live Dashboard:** [https://barathkrishnan111.github.io/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/](https://barathkrishnan111.github.io/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/)
+
+This project implements the **RS-PLO (Risk-Sensitive Predictive Lyapunov Optimization)** framework for dynamic task offloading in Mobile Edge Computing (MEC) environments. Every task is **actually executed** — either on your local device or offloaded to one of **3 real TCP edge servers** at different distances.
 
 Based on the paper: *"Lyapunov-Stable Dynamic Task Offloading in Non-Stationary Edge Environments: A Deterministic Drift-Plus-Penalty Framework"*
 
@@ -10,6 +15,7 @@ Based on the paper: *"Lyapunov-Stable Dynamic Task Offloading in Non-Stationary 
 
 ## Table of Contents
 
+- [Quick Start (Step-by-Step)](#quick-start-step-by-step)
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [The RS-PLO Algorithm](#the-rs-plo-algorithm)
@@ -20,13 +26,83 @@ Based on the paper: *"Lyapunov-Stable Dynamic Task Offloading in Non-Stationary 
   - [Live Dashboard](#1-live-dashboard-dashboardpy)
   - [Interactive CLI Demo](#2-interactive-cli-demo-demopy)
   - [Automated Experiment](#3-automated-experiment-run_experimentpy)
-  - [Standalone Edge Server](#4-standalone-edge-server)
+  - [Paper-Style Results](#4-paper-style-results)
+  - [Standalone Edge Server](#5-standalone-edge-server)
+- [GitHub Pages — Remote Control Dashboard](#github-pages--remote-control-dashboard)
 - [Supported Task Types](#supported-task-types)
 - [System Parameters](#system-parameters)
 - [Results and Analysis](#results-and-analysis)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [How the Decision Works](#how-the-decision-works)
 - [Technical Details](#technical-details)
 - [Docker](#docker)
+- [Unit Tests](#unit-tests)
+
+---
+
+## Quick Start (Step-by-Step)
+
+Get the full system running in **under 2 minutes**:
+
+### Step 1: Clone & Install
+
+```bash
+git clone https://github.com/barathkrishnan111/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing.git
+cd RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing
+pip install numpy matplotlib
+```
+
+### Step 2: Launch the Live Dashboard
+
+```bash
+python dashboard.py
+```
+
+This starts:
+- ✅ **3 edge servers** on ports 9999, 10000, 10001
+- ✅ **Web dashboard** at `http://localhost:8080`
+- ✅ **Interactive CLI** in your terminal
+
+### Step 3: Open the Dashboard
+
+Open **http://localhost:8080** in your browser. You'll see a dark-themed dashboard with real-time charts.
+
+### Step 4: Send Tasks
+
+Type commands in the terminal and watch the dashboard update live:
+
+```
+rsplo> matrix 100      # Offloads to Edge-1 (good channel)
+rsplo> hash 500        # SHA-256 hashing
+rsplo> tunnel          # Enter tunnel → volatility spikes → switches to LOCAL
+rsplo> burst           # Send 5 tasks rapidly
+rsplo> move close      # Move close to edge → offloading resumes
+```
+
+### Step 5: Try Auto-Run Mode
+
+Click the **Auto-Run** button on the dashboard to automatically send random tasks every 2 seconds and watch the RS-PLO algorithm adapt.
+
+### Step 6: Run the Full Experiment
+
+```bash
+python run_experiment.py    # RS-PLO vs Static comparison + plots
+python generate_results.py  # 5-scenario paper-style results
+```
+
+### Step 7: Run Unit Tests
+
+```bash
+python -m pytest test_engine.py -v   # 29 tests
+```
+
+### Step 8 (Optional): Remote Dashboard via GitHub Pages
+
+```bash
+npx -y localtunnel --port 8080
+```
+
+Then open the [live GitHub Pages dashboard](https://barathkrishnan111.github.io/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/), paste your tunnel URL, and control your edge servers remotely from anywhere!
 
 ---
 
@@ -522,6 +598,85 @@ The drift captures **queue pressure**, the penalty captures **energy cost**, and
 
 ---
 
+## GitHub Pages — Remote Control Dashboard
+
+Control your local edge servers from anywhere using the hosted dashboard:
+
+```
+┌──────────────────────────────────┐       SSE (live data)        ┌────────────────────────┐
+│   GitHub Pages Dashboard         │◄──────────────────────────────│  Your Local Machine    │
+│   (Remote Control Panel)         │──────────────────────────────►│  python dashboard.py   │
+│                                  │  HTTP (commands/tasks/dist)   │  + 3 Edge Servers      │
+└──────────────────────────────────┘                               └────────────────────────┘
+```
+
+### How to Connect
+
+1. **Start your local server:**
+   ```bash
+   python dashboard.py
+   ```
+
+2. **Expose to the internet** (pick one):
+   ```bash
+   # Option A: localtunnel (no install needed)
+   npx -y localtunnel --port 8080
+
+   # Option B: ngrok
+   ngrok http 8080
+   ```
+
+3. **Open the GitHub Pages dashboard:**
+   - Go to [https://barathkrishnan111.github.io/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/](https://barathkrishnan111.github.io/RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing/)
+   - Paste your tunnel URL (e.g. `https://abc123.loca.lt`)
+   - Click **Connect**
+
+4. **You're connected!** Now you can:
+   - ⚡ **Send tasks** — Matrix, Hash, Prime, Sort, Encrypt buttons
+   - 📏 **Change distance** — Drag the slider (30m to 2500m)
+   - 🔄 **Auto-run** — Toggle automatic task submission every 2s
+   - 🏃 **Move user** — Close / Far / Tunnel buttons
+   - 💥 **Burst mode** — Send 5x tasks at once
+   - 📊 **Live charts** — Queue, Volatility, V(t), Energy, Latency, Server pie chart
+
+---
+
+### 4. Paper-Style Results
+
+Generate publication-quality comparison tables across 5 scenarios:
+
+```bash
+python generate_results.py
+```
+
+**Scenarios tested:**
+
+| Scenario | Description | Parameters |
+|----------|-------------|------------|
+| Default Office | Standard indoor environment | N=5, 200 slots |
+| High Volatility | Vehicle/moving user | burst_prob=0.3, beta=3.0 |
+| Heavy Load | Factory IoT with many devices | N=10, burst_prob=0.5 |
+| Energy-Constrained | Battery-limited sensor | V_max=20.0 |
+| Latency-Critical | Real-time application | V_max=2.0 |
+
+**Output:** Formatted comparison tables + `results/04_paper_comparison.png`
+
+---
+
+## CI/CD Pipeline
+
+Three GitHub Actions workflows automate testing, building, and deployment:
+
+| Workflow | Trigger | What It Does |
+|----------|---------|--------------|
+| **CI** (`.github/workflows/ci.yml`) | Every push/PR | Runs 29 unit tests, import checks, builds Docker image |
+| **Deploy Pages** (`.github/workflows/deploy-pages.yml`) | Every push | Deploys GitHub Pages dashboard from `docs/` |
+| **Experiment** (`.github/workflows/experiment.yml`) | Manual trigger | Runs full experiment on GitHub servers, uploads result plots |
+
+To run the experiment on GitHub: **Actions** → **Run Experiment** → **Run workflow**
+
+---
+
 ## Docker
 
 Run the entire system with one command:
@@ -540,6 +695,26 @@ Or manually:
 docker build -t rsplo .
 docker run -it -p 8080:8080 rsplo
 ```
+
+---
+
+## Unit Tests
+
+29 tests covering all core functionality:
+
+```bash
+python -m pytest test_engine.py -v
+```
+
+| Test Class | Tests | Covers |
+|------------|:-----:|--------|
+| `TestEdgeServerConfig` | 2 | Dataclass creation and defaults |
+| `TestSystemParams` | 5 | Parameter defaults, server configs |
+| `TestUserState` | 1 | Initial state validation |
+| `TestRSPLO` | 12 | V(t), channel model, DPP decisions, energy |
+| `TestLocalExecution` | 5 | All 5 task types execute correctly |
+| `TestStaticLyapunov` | 1 | Baseline engine initialization |
+| `TestMultiEdgeScenarios` | 2 | Multi-server integration |
 
 ---
 
