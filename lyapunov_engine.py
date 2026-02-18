@@ -128,6 +128,21 @@ def execute_on_edge(task_type: str, params: dict, task_id: int,
 
 
 # ─────────────────────────────────────────────
+#  EDGE SERVER CONFIG (Multi-Edge Support)
+# ─────────────────────────────────────────────
+
+@dataclass
+class EdgeServerConfig:
+    """Configuration for one edge server in the multi-edge setup."""
+    name: str = "Edge-1"
+    host: str = "127.0.0.1"
+    port: int = 9999
+    distance: float = 150.0          # Distance from user area (meters)
+    compute_multiplier: float = 1.0  # CPU speed relative to base (1.0 = standard)
+    description: str = "Standard MEC Server"
+
+
+# ─────────────────────────────────────────────
 #  SYSTEM PARAMETERS (from the paper)
 # ─────────────────────────────────────────────
 
@@ -169,8 +184,30 @@ class SystemParams:
 
     # Simulation
     time_slots: int = 200           # Number of time slots
-    edge_host: str = "127.0.0.1"
+    edge_host: str = "127.0.0.1"    # Legacy single-server (used if edge_servers empty)
     edge_port: int = 9999
+
+    # Multi-Edge Server Configuration
+    edge_servers: list = field(default_factory=lambda: [
+        EdgeServerConfig(
+            name="Edge-1 (Near)",
+            host="127.0.0.1", port=9999,
+            distance=150.0, compute_multiplier=1.0,
+            description="Close range — standard MEC"
+        ),
+        EdgeServerConfig(
+            name="Edge-2 (Mid)",
+            host="127.0.0.1", port=10000,
+            distance=600.0, compute_multiplier=1.5,
+            description="Medium range — powerful CPU"
+        ),
+        EdgeServerConfig(
+            name="Edge-3 (Far)",
+            host="127.0.0.1", port=10001,
+            distance=1200.0, compute_multiplier=2.0,
+            description="Long range — GPU-equipped"
+        ),
+    ])
 
     # Task types to cycle through
     task_types: list = field(default_factory=lambda: ["matrix_multiply", "hash_data", "prime_factorize"])
@@ -194,7 +231,8 @@ class UserState:
     Z_history: list = field(default_factory=list)
     V_history: list = field(default_factory=list)
     energy_history: list = field(default_factory=list)
-    decision_history: list = field(default_factory=list)  # 0=local, 1=offload
+    decision_history: list = field(default_factory=list)  # 0=local, 1+=edge server index
+    server_choice_history: list = field(default_factory=list)  # name of chosen server
     latency_history: list = field(default_factory=list)
     channel_gain_history: list = field(default_factory=list)
 
@@ -226,14 +264,15 @@ class RSPLO:
             )
             self.users.append(user)
 
-    def compute_channel_gain(self, user: UserState) -> float:
+    def compute_channel_gain(self, user: UserState, distance: float = None) -> float:
         """
         Compute channel gain h(t) = h0 * d^(-alpha) * rayleigh_fading
         Real channel model with path loss + Rayleigh fading.
+        distance: override distance (used for multi-edge server calculations)
         """
-        path_loss = self.params.h0 * (user.distance ** (-self.params.alpha))
-        rayleigh = self.rng.exponential(1.0)  # Rayleigh fading
-        return path_loss * rayleigh
+        d = max(distance if distance is not None else user.distance, 1.0)
+        rayleigh = self.rng.exponential(1.0)
+        return self.params.h0 * (d ** (-self.params.alpha)) * rayleigh
 
     def compute_channel_gain_db(self, channel_gain: float) -> float:
         """Convert channel gain to dB scale for meaningful comparison."""
@@ -343,59 +382,82 @@ class RSPLO:
         """
         return self.compute_transmission_rate(channel_gain)
 
+    def compute_channel_gain_for_server(self, user: UserState, server: 'EdgeServerConfig') -> float:
+        """
+        Compute channel gain to a specific edge server.
+        Uses the distance between user position and server position.
+        """
+        # Effective distance = absolute difference of positions
+        effective_distance = max(abs(user.distance - 0) + server.distance * 0.5, 30.0)
+        # Simpler: use server distance as base, user distance adds to it
+        d = max(server.distance + (user.distance - 300) * 0.3, 30.0)
+        rayleigh = self.rng.exponential(1.0)
+        return self.params.h0 * (d ** (-self.params.alpha)) * rayleigh
+
     def drift_plus_penalty_decision(self, user: UserState, task: dict,
                                      channel_gain: float) -> int:
         """
         The core RS-PLO decision: minimize drift-plus-penalty.
 
-        Uses normalized form so drift and penalty are on comparable scales:
-          Cost(x) = drift_weight * drift_x + penalty_weight * V(t) * energy_x
-
-        When V is HIGH (stable): energy penalty matters → pick lower energy
-        When V is LOW (volatile): drift matters → pick higher service rate (μ)
-
-        Returns: 0 = execute locally, 1 = offload to edge
+        Multi-Edge: evaluates LOCAL + each edge server, picks lowest cost.
+        Returns: 0 = local, 1 = edge_1, 2 = edge_2, 3 = edge_3, ...
         """
         V_t = self.compute_V(user.Z)
         Q_t = user.Q
         A_t = float(task["task_bits"])
 
-        # ── Compute service rates ──
-        mu_local = self.compute_local_service_rate()   # 10M bits/s (IoT MCU)
-        mu_offload = self.compute_edge_service_rate(channel_gain)  # varies
-
-        # ── Compute energy costs ──
+        # ── Local option ──
+        mu_local = self.compute_local_service_rate()
         E_local = self.compute_local_energy(A_t)
-        E_offload = self.compute_offload_energy(A_t, mu_offload)
 
-        # ── Normalized Drift-Plus-Penalty ──
-        # Drift: how much the queue benefits from this choice (normalized)
-        # Higher service rate → lower (more negative) drift → better
-        mu_max = max(mu_local, mu_offload, 1.0)
-        drift_local = (A_t - mu_local) / mu_max      # normalized to [-1, ~0]
-        drift_offload = (A_t - mu_offload) / mu_max
+        # ── Edge server options ──
+        edge_options = []  # (server_index, mu, energy, server_config)
+        for i, server in enumerate(self.params.edge_servers):
+            # Channel gain to this specific server
+            h = self.compute_channel_gain_for_server(user, server)
+            tx_rate = self.compute_transmission_rate(h)
+            # Compute multiplier boosts effective service rate
+            mu_edge = tx_rate * server.compute_multiplier
+            E_edge = self.compute_offload_energy(A_t, tx_rate)
+            edge_options.append((i + 1, mu_edge, E_edge, server))
 
-        # Penalty: energy cost (normalized by max energy)
-        E_max = max(E_local, E_offload, 1e-10)
-        penalty_local = E_local / E_max       # normalized to [0, 1]
-        penalty_offload = E_offload / E_max
+        # ── Collect all options: (decision_id, mu, E) ──
+        all_options = [(0, mu_local, E_local, None)] + edge_options
 
-        # Queue-weighted drift + V-weighted energy penalty
-        # Q_t amplifies the drift term (bigger queue → care more about service rate)
-        # V(t) amplifies the penalty term (stable channel → care more about energy)
-        Q_norm = Q_t / max(A_t, 1.0)  # queue size relative to task
+        # ── Find max values for normalization ──
+        mu_max = max(opt[1] for opt in all_options)
+        mu_max = max(mu_max, 1.0)
+        E_max = max(opt[2] for opt in all_options)
+        E_max = max(E_max, 1e-10)
 
-        cost_local = Q_norm * drift_local + V_t * penalty_local
-        cost_offload = Q_norm * drift_offload + V_t * penalty_offload
+        # ── Compute normalized DPP cost for each option ──
+        Q_norm = Q_t / max(A_t, 1.0)
+        best_decision = 0
+        best_cost = float('inf')
 
-        if cost_offload < cost_local:
-            return 1  # offload
-        else:
-            return 0  # local
+        for decision_id, mu, E, server in all_options:
+            drift = (A_t - mu) / mu_max
+            penalty = E / E_max
+            cost = Q_norm * drift + V_t * penalty
+            if cost < best_cost:
+                best_cost = cost
+                best_decision = decision_id
+
+        return best_decision
+
+    def get_server_for_decision(self, decision: int) -> Optional['EdgeServerConfig']:
+        """Get the EdgeServerConfig for a given decision index (0=local, 1+=edge)."""
+        if decision == 0 or not self.params.edge_servers:
+            return None
+        idx = decision - 1
+        if 0 <= idx < len(self.params.edge_servers):
+            return self.params.edge_servers[idx]
+        return None
 
     def run_slot(self, user: UserState) -> dict:
         """
         Execute one complete time slot for a user.
+        Multi-edge: decision can be 0=local, 1+=edge server index.
         """
         self.global_task_id += 1
 
@@ -405,14 +467,13 @@ class RSPLO:
         # 2. Generate task
         task = self.generate_task()
 
-        # 3. Compute channel gain
+        # 3. Compute channel gain (primary, for volatility tracking)
         channel_gain = self.compute_channel_gain(user)
         channel_gain_db = self.compute_channel_gain_db(channel_gain)
 
         # 4. Compute NORMALIZED prediction error and update Volatility Queue Z(t)
         if user.prev_channel_gain > 0:
             prev_db = self.compute_channel_gain_db(user.prev_channel_gain)
-            # Normalized prediction error in dB
             prediction_error = abs(channel_gain_db - prev_db) / 10.0
         else:
             prediction_error = 0.0
@@ -424,37 +485,38 @@ class RSPLO:
         # 5. Compute adaptive V(t)
         V_t = self.compute_V(user.Z)
 
-        # 6. Make offloading decision
+        # 6. Make offloading decision (multi-edge)
         decision = self.drift_plus_penalty_decision(user, task, channel_gain)
+        server = self.get_server_for_decision(decision)
+        server_name = server.name if server else "LOCAL"
 
         # 7. ACTUALLY EXECUTE THE TASK
-        if decision == 1:
+        if decision >= 1 and server:
             result = execute_on_edge(
                 task["task_type"], task["params"],
                 self.global_task_id,
-                self.params.edge_host, self.params.edge_port
+                server.host, server.port
             )
             if "error" in result and result.get("error"):
                 result = execute_locally(task["task_type"], task["params"])
                 decision = 0
+                server_name = "LOCAL (fallback)"
         else:
             result = execute_locally(task["task_type"], task["params"])
 
         exec_time = result["exec_time"]
 
         # 8. Compute actual energy consumed
-        tx_rate = self.compute_transmission_rate(channel_gain)
-        if decision == 1:
+        if decision >= 1 and server:
+            h = self.compute_channel_gain_for_server(user, server)
+            tx_rate = self.compute_transmission_rate(h)
             energy = self.compute_offload_energy(task["task_bits"], tx_rate)
-        else:
-            energy = self.compute_local_energy(task["task_bits"])
-
-        # 9. Update physical queue: Q(t+1) = max(Q(t) - μ(t) * Δt, 0) + A(t)
-        if decision == 1:
             service_bits = tx_rate * exec_time
         else:
+            energy = self.compute_local_energy(task["task_bits"])
             service_bits = self.params.f_local * exec_time
 
+        # 9. Update physical queue
         user.Q = max(user.Q - service_bits, 0) + task["task_bits"]
 
         # 10. Record metrics
@@ -463,6 +525,7 @@ class RSPLO:
         user.V_history.append(V_t)
         user.energy_history.append(energy)
         user.decision_history.append(decision)
+        user.server_choice_history.append(server_name)
         user.latency_history.append(exec_time)
         user.channel_gain_history.append(channel_gain_db)
 
@@ -471,7 +534,9 @@ class RSPLO:
             "user_id": user.user_id,
             "task_type": task["task_type"],
             "is_burst": task["is_burst"],
-            "decision": "OFFLOAD" if decision == 1 else "LOCAL",
+            "decision": server_name if decision >= 1 else "LOCAL",
+            "decision_id": decision,
+            "server_name": server_name,
             "exec_time_ms": exec_time * 1000,
             "energy_mJ": energy * 1000,
             "Q": user.Q,
@@ -539,7 +604,7 @@ class RSPLO:
             }
             summary["users"].append(user_summary)
             total_decisions += len(user.decision_history)
-            total_offloads += sum(user.decision_history)
+            total_offloads += sum(1 for d in user.decision_history if d >= 1)
 
         summary["avg_Q"] = np.mean([u["avg_Q"] for u in summary["users"]])
         summary["avg_Z"] = np.mean([u["avg_Z"] for u in summary["users"]])

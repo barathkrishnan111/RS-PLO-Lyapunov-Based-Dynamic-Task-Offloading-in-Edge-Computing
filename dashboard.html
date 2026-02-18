@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RS-PLO Live Dashboard — Multi-Edge Task Offloading</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.8);
+            --border: rgba(55, 65, 81, 0.5);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-dim: #6b7280;
+            --accent-cyan: #22d3ee;
+            --accent-blue: #3b82f6;
+            --accent-purple: #a855f7;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-orange: #f97316;
+            --glow-cyan: rgba(34, 211, 238, 0.15);
+            --glow-blue: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Animated background ── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(34, 211, 238, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.02) 0%, transparent 70%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ── Header ── */
+        .header {
+            position: relative;
+            z-index: 1;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            background: rgba(10, 14, 23, 0.9);
+        }
+
+        .header-left h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .header-left p {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .connection-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent-red);
+            transition: background 0.3s;
+        }
+
+        .connection-dot.connected {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ── Main Grid ── */
+        .dashboard {
+            position: relative;
+            z-index: 1;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            backdrop-filter: blur(10px);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(34, 211, 238, 0.3);
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.05);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ── Stats Row ── */
+        .stats-row {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            transition: color 0.3s;
+        }
+
+        .stat-sub {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        /* ── Charts ── */
+        .chart-container {
+            position: relative;
+            height: 220px;
+        }
+
+        /* ── Server Cards ── */
+        .servers-grid {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .server-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .server-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .server-card.local::before { background: var(--accent-yellow); }
+        .server-card.edge1::before { background: var(--accent-cyan); }
+        .server-card.edge2::before { background: var(--accent-blue); }
+        .server-card.edge3::before { background: var(--accent-purple); }
+
+        .server-card.active {
+            border-color: rgba(34, 211, 238, 0.5);
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.1);
+        }
+
+        .server-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .server-detail {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .server-count {
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 8px 0 4px;
+        }
+
+        .server-pct {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* ── Decision Feed ── */
+        .feed-container {
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        .feed-item {
+            display: grid;
+            grid-template-columns: 30px 1fr 120px 80px;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(55, 65, 81, 0.3);
+            font-size: 0.8rem;
+            animation: fadeIn 0.3s ease-out;
+            transition: background 0.2s;
+        }
+
+        .feed-item:hover {
+            background: rgba(34, 211, 238, 0.03);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .feed-id {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+        }
+
+        .feed-label {
+            color: var(--text-primary);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .feed-server {
+            font-weight: 600;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .feed-server.local { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); }
+        .feed-server.edge1 { background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan); }
+        .feed-server.edge2 { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .feed-server.edge3 { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+
+        .feed-time {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            text-align: right;
+            font-size: 0.75rem;
+        }
+
+        /* ── Waiting State ── */
+        .waiting {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-dim);
+        }
+
+        .waiting-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<!-- ─── Header ─── -->
+<div class="header">
+    <div class="header-left">
+        <h1>RS-PLO Live Dashboard</h1>
+        <p>Multi-Edge Real-Time Task Offloading Visualization</p>
+    </div>
+    <div class="connection-status">
+        <div class="connection-dot" id="connectionDot"></div>
+        <span id="connectionText">Connecting...</span>
+    </div>
+</div>
+
+<!-- ─── Dashboard ─── -->
+<div class="dashboard">
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Tasks Processed</div>
+            <div class="stat-value" id="statTasks" style="color: var(--accent-cyan)">0</div>
+            <div class="stat-sub">total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Queue Q(t)</div>
+            <div class="stat-value" id="statQ" style="color: var(--accent-blue)">0</div>
+            <div class="stat-sub">bits</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Volatility Z(t)</div>
+            <div class="stat-value" id="statZ" style="color: var(--accent-red)">0.000</div>
+            <div class="stat-sub">channel risk</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Control V(t)</div>
+            <div class="stat-value" id="statV" style="color: var(--accent-green)">10.00</div>
+            <div class="stat-sub">energy weight</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Offload Ratio</div>
+            <div class="stat-value" id="statOffload" style="color: var(--accent-purple)">0%</div>
+            <div class="stat-sub">to edge servers</div>
+        </div>
+    </div>
+
+    <!-- Server Distribution -->
+    <div class="servers-grid">
+        <div class="server-card local">
+            <div class="server-name" style="color: var(--accent-yellow)">LOCAL</div>
+            <div class="server-detail">IoT MCU (10 MHz)</div>
+            <div class="server-count" id="serverLocal" style="color: var(--accent-yellow)">0</div>
+            <div class="server-pct" id="serverLocalPct">0%</div>
+        </div>
+        <div class="server-card edge1">
+            <div class="server-name" style="color: var(--accent-cyan)">Edge-1 (Near)</div>
+            <div class="server-detail">150m — Standard</div>
+            <div class="server-count" id="serverEdge1" style="color: var(--accent-cyan)">0</div>
+            <div class="server-pct" id="serverEdge1Pct">0%</div>
+        </div>
+        <div class="server-card edge2">
+            <div class="server-name" style="color: var(--accent-blue)">Edge-2 (Mid)</div>
+            <div class="server-detail">600m — Powerful</div>
+            <div class="server-count" id="serverEdge2" style="color: var(--accent-blue)">0</div>
+            <div class="server-pct" id="serverEdge2Pct">0%</div>
+        </div>
+        <div class="server-card edge3">
+            <div class="server-name" style="color: var(--accent-purple)">Edge-3 (Far)</div>
+            <div class="server-detail">1200m — GPU</div>
+            <div class="server-count" id="serverEdge3" style="color: var(--accent-purple)">0</div>
+            <div class="server-pct" id="serverEdge3Pct">0%</div>
+        </div>
+    </div>
+
+    <!-- Chart: Queue & Volatility -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Queue Q(t) & Volatility Z(t)</span>
+            <span class="card-badge" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue)">LIVE</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartQZ"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart: V(t) Control -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Control V(t) & Energy</span>
+            <span class="card-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green)">ADAPTIVE</span>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartVE"></canvas>
+        </div>
+    </div>
+
+    <!-- Decision Feed -->
+    <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+            <span class="card-title">Decision Feed</span>
+            <span class="card-badge" id="feedCount" style="background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan)">0 tasks</span>
+        </div>
+        <div class="feed-container" id="feedContainer">
+            <div class="waiting">
+                <div class="waiting-icon">&#9889;</div>
+                <div>Waiting for tasks...</div>
+                <div style="font-size: 0.75rem; margin-top: 4px;">Type commands in the CLI to see live updates</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─── State ───
+    const state = {
+        tasks: [],
+        serverCounts: { local: 0, edge1: 0, edge2: 0, edge3: 0 },
+        Q_history: [],
+        Z_history: [],
+        V_history: [],
+        E_history: [],
+        labels: [],
+        maxPoints: 100,
+    };
+
+    // ─── Charts Setup ───
+    const chartColors = {
+        cyan: 'rgba(34, 211, 238, 1)',
+        cyanFill: 'rgba(34, 211, 238, 0.1)',
+        blue: 'rgba(59, 130, 246, 1)',
+        blueFill: 'rgba(59, 130, 246, 0.1)',
+        red: 'rgba(239, 68, 68, 1)',
+        redFill: 'rgba(239, 68, 68, 0.1)',
+        green: 'rgba(16, 185, 129, 1)',
+        greenFill: 'rgba(16, 185, 129, 0.1)',
+        purple: 'rgba(168, 85, 247, 1)',
+        purpleFill: 'rgba(168, 85, 247, 0.1)',
+        yellow: 'rgba(245, 158, 11, 1)',
+        yellowFill: 'rgba(245, 158, 11, 0.1)',
+    };
+
+    Chart.defaults.color = '#9ca3af';
+    Chart.defaults.borderColor = 'rgba(55, 65, 81, 0.3)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    const chartQZ = new Chart(document.getElementById('chartQZ'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Q(t) / 1M',
+                    data: [],
+                    borderColor: chartColors.blue,
+                    backgroundColor: chartColors.blueFill,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    yAxisID: 'yQ',
+                },
+                {
+                    label: 'Z(t)',
+                    data: [],
+                    borderColor: chartColors.red,
+                    backgroundColor: chartColors.redFill,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    yAxisID: 'yZ',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            animation: { duration: 300 },
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } },
+            scales: {
+                x: { display: false },
+                yQ: { position: 'left', title: { display: true, text: 'Q(t) / 1M' }, grid: { color: 'rgba(55, 65, 81, 0.2)' } },
+                yZ: { position: 'right', title: { display: true, text: 'Z(t)' }, grid: { display: false } },
+            }
+        }
+    });
+
+    const chartVE = new Chart(document.getElementById('chartVE'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'V(t)',
+                    data: [],
+                    borderColor: chartColors.green,
+                    backgroundColor: chartColors.greenFill,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    yAxisID: 'yV',
+                },
+                {
+                    label: 'Energy (mJ)',
+                    data: [],
+                    borderColor: chartColors.yellow,
+                    backgroundColor: chartColors.yellowFill,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    yAxisID: 'yE',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            animation: { duration: 300 },
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } },
+            scales: {
+                x: { display: false },
+                yV: { position: 'left', title: { display: true, text: 'V(t)' }, grid: { color: 'rgba(55, 65, 81, 0.2)' } },
+                yE: { position: 'right', title: { display: true, text: 'Energy (mJ)' }, grid: { display: false } },
+            }
+        }
+    });
+
+    // ─── Helper Functions ───
+    function getServerClass(decision_id) {
+        if (decision_id === 0) return 'local';
+        if (decision_id === 1) return 'edge1';
+        if (decision_id === 2) return 'edge2';
+        if (decision_id === 3) return 'edge3';
+        return 'local';
+    }
+
+    function getServerCountKey(decision_id) {
+        if (decision_id === 0) return 'local';
+        if (decision_id === 1) return 'edge1';
+        if (decision_id === 2) return 'edge2';
+        if (decision_id === 3) return 'edge3';
+        return 'local';
+    }
+
+    function formatNumber(n) {
+        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+        return n.toFixed(0);
+    }
+
+    // ─── Update UI ───
+    function updateStats(task) {
+        const totalTasks = state.tasks.length;
+        document.getElementById('statTasks').textContent = totalTasks;
+        document.getElementById('statQ').textContent = formatNumber(task.Q);
+        document.getElementById('statZ').textContent = task.Z.toFixed(3);
+        document.getElementById('statV').textContent = task.V.toFixed(2);
+
+        const offloaded = state.tasks.filter(t => t.decision_id > 0).length;
+        const pct = totalTasks > 0 ? Math.round(offloaded / totalTasks * 100) : 0;
+        document.getElementById('statOffload').textContent = pct + '%';
+    }
+
+    function updateServerCards() {
+        const total = state.tasks.length || 1;
+        for (const [key, count] of Object.entries(state.serverCounts)) {
+            const id = key.charAt(0).toUpperCase() + key.slice(1);
+            document.getElementById('server' + id).textContent = count;
+            document.getElementById('server' + id + 'Pct').textContent = Math.round(count / total * 100) + '%';
+        }
+
+        // Highlight most recently used server
+        document.querySelectorAll('.server-card').forEach(el => el.classList.remove('active'));
+        if (state.tasks.length > 0) {
+            const last = state.tasks[state.tasks.length - 1];
+            const cls = getServerClass(last.decision_id);
+            const card = document.querySelector('.server-card.' + cls);
+            if (card) card.classList.add('active');
+        }
+    }
+
+    function addToCharts(task) {
+        const label = '#' + task.id;
+        state.labels.push(label);
+        state.Q_history.push(task.Q / 1e6);
+        state.Z_history.push(task.Z);
+        state.V_history.push(task.V);
+        state.E_history.push(task.energy_mJ);
+
+        // Limit points
+        if (state.labels.length > state.maxPoints) {
+            state.labels.shift();
+            state.Q_history.shift();
+            state.Z_history.shift();
+            state.V_history.shift();
+            state.E_history.shift();
+        }
+
+        // Update Q/Z chart
+        chartQZ.data.labels = state.labels;
+        chartQZ.data.datasets[0].data = state.Q_history;
+        chartQZ.data.datasets[1].data = state.Z_history;
+        chartQZ.update();
+
+        // Update V/E chart
+        chartVE.data.labels = state.labels;
+        chartVE.data.datasets[0].data = state.V_history;
+        chartVE.data.datasets[1].data = state.E_history;
+        chartVE.update();
+    }
+
+    function addToFeed(task) {
+        const feed = document.getElementById('feedContainer');
+
+        // Remove waiting message on first task
+        if (state.tasks.length === 1) {
+            feed.innerHTML = '';
+        }
+
+        const div = document.createElement('div');
+        div.className = 'feed-item';
+
+        const cls = getServerClass(task.decision_id);
+
+        div.innerHTML = `
+            <span class="feed-id">#${task.id}</span>
+            <span class="feed-label">${task.label}</span>
+            <span class="feed-server ${cls}">${task.decision}</span>
+            <span class="feed-time">${task.exec_ms.toFixed(2)}ms</span>
+        `;
+
+        feed.insertBefore(div, feed.firstChild);
+        document.getElementById('feedCount').textContent = state.tasks.length + ' tasks';
+
+        // Keep feed manageable
+        while (feed.children.length > 50) {
+            feed.removeChild(feed.lastChild);
+        }
+    }
+
+    // ─── SSE Connection ───
+    function connectSSE() {
+        const evtSource = new EventSource('/events');
+
+        evtSource.addEventListener('connected', function(e) {
+            document.getElementById('connectionDot').classList.add('connected');
+            document.getElementById('connectionText').textContent = 'Connected';
+        });
+
+        evtSource.addEventListener('task', function(e) {
+            const task = JSON.parse(e.data);
+            state.tasks.push(task);
+
+            // Update server counts
+            const key = getServerCountKey(task.decision_id);
+            state.serverCounts[key] = (state.serverCounts[key] || 0) + 1;
+
+            updateStats(task);
+            updateServerCards();
+            addToCharts(task);
+            addToFeed(task);
+        });
+
+        evtSource.addEventListener('state', function(e) {
+            const s = JSON.parse(e.data);
+            document.getElementById('statQ').textContent = formatNumber(s.Q);
+            document.getElementById('statZ').textContent = s.Z.toFixed(3);
+            document.getElementById('statV').textContent = s.V.toFixed(2);
+            document.getElementById('statTasks').textContent = s.task_count;
+        });
+
+        evtSource.addEventListener('init', function(e) {
+            const data = JSON.parse(e.data);
+            console.log('Dashboard initialized:', data);
+        });
+
+        evtSource.onerror = function() {
+            document.getElementById('connectionDot').classList.remove('connected');
+            document.getElementById('connectionText').textContent = 'Reconnecting...';
+        };
+    }
+
+    // ─── Start ───
+    connectSSE();
+</script>
+
+</body>
+</html>

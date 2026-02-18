@@ -21,30 +21,36 @@ import matplotlib.pyplot as plt
 from lyapunov_engine import RSPLO, StaticLyapunov, SystemParams
 
 
-def start_edge_server(port=9999) -> subprocess.Popen:
-    """Start the edge server as a background subprocess."""
+def start_edge_servers(ports=[9999, 10000, 10001]) -> list:
+    """Start multiple edge servers as background subprocesses."""
     print("=" * 70)
     print("  LYAPUNOV-BASED TASK OFFLOADING IN EDGE COMPUTING")
     print("  RS-PLO: Risk-Sensitive Predictive Lyapunov Optimization")
+    print("  Multi-Edge Server Mode (3 servers)")
     print("=" * 70)
     print()
-    print("[1/5] Starting Edge Server...")
+    print(f"[1/5] Starting {len(ports)} Edge Servers...")
 
-    server_proc = subprocess.Popen(
-        [sys.executable, "edge_server.py", str(port)],
-        cwd=os.path.dirname(os.path.abspath(__file__)),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-    )
-    time.sleep(2)  # Wait for server to start
+    procs = []
+    for port in ports:
+        proc = subprocess.Popen(
+            [sys.executable, "edge_server.py", str(port)],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        )
+        procs.append(proc)
 
-    if server_proc.poll() is not None:
-        print("[ERROR] Edge server failed to start!")
-        sys.exit(1)
+    time.sleep(2)  # Wait for servers to start
 
-    print(f"       Edge server running on 127.0.0.1:{port} (PID: {server_proc.pid})")
-    return server_proc
+    for i, proc in enumerate(procs):
+        if proc.poll() is not None:
+            print(f"[ERROR] Edge server on port {ports[i]} failed to start!")
+            sys.exit(1)
+        print(f"       Edge-{i+1} running on 127.0.0.1:{ports[i]} (PID: {proc.pid})")
+
+    return procs
 
 
 def run_rsplo(params: SystemParams) -> dict:
@@ -315,8 +321,9 @@ def main():
 
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 
-    # ── Start edge server ──
-    server_proc = start_edge_server(params.edge_port)
+    # ── Start edge servers (3 servers) ──
+    server_ports = [s.port for s in params.edge_servers]
+    server_procs = start_edge_servers(server_ports)
 
     try:
         # ── Run RS-PLO ──
@@ -332,16 +339,17 @@ def main():
         print_summary(rsplo_results, static_results)
 
         print(f"\nPlots saved to: {output_dir}/")
-        print("Done! ✓")
+        print("Done! \u2713")
 
     finally:
-        # ── Stop edge server ──
-        server_proc.terminate()
-        try:
-            server_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server_proc.kill()
-        print("\n[EDGE SERVER] Stopped.")
+        # ── Stop all edge servers ──
+        for proc in server_procs:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        print(f"\n[EDGE SERVERS] All {len(server_procs)} servers stopped.")
 
 
 if __name__ == "__main__":
