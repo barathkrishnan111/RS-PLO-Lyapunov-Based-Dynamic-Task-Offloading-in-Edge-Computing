@@ -71,7 +71,15 @@ demo_instance = None  # Set in main()
 # ─────────────────────────────────────────────
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
-    """Custom HTTP handler: dashboard HTML, SSE events, auto-run, distance slider."""
+    """Custom HTTP handler: dashboard HTML, SSE events, auto-run, distance slider, remote commands."""
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight for cross-origin requests from GitHub Pages."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -115,6 +123,16 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"status": "queued"})
             if demo_instance:
                 threading.Thread(target=self._run_random_task, daemon=True).start()
+            return
+
+        elif path == "/run_command":
+            # Remote command execution from GitHub Pages dashboard
+            cmd = query.get("cmd", [""])[0]
+            if cmd and demo_instance:
+                self._send_json({"status": "ok", "cmd": cmd})
+                threading.Thread(target=lambda: demo_instance.handle_command(cmd), daemon=True).start()
+            else:
+                self._send_json({"status": "error", "msg": "no command"})
             return
 
         elif path == "/set_distance":

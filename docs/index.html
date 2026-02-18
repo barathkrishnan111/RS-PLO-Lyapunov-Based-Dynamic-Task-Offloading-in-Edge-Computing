@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RS-PLO Dashboard Demo — Static Preview</title>
+    <title>RS-PLO Edge Dashboard — Remote Control Panel</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
@@ -17,10 +17,12 @@
 
         :root {
             --bg: #0a0e17;
+            --bg2: #111827;
             --card: rgba(17, 24, 39, 0.8);
             --border: rgba(55, 65, 81, 0.5);
             --text: #f3f4f6;
             --dim: #6b7280;
+            --sec: #9ca3af;
             --cyan: #22d3ee;
             --blue: #3b82f6;
             --purple: #a855f7;
@@ -34,7 +36,8 @@
             font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh
+            min-height: 100vh;
+            overflow-x: hidden
         }
 
         body::before {
@@ -42,13 +45,14 @@
             position: fixed;
             inset: 0;
             background: radial-gradient(at 20% 20%, rgba(34, 211, 238, 0.04), transparent 50%), radial-gradient(at 80% 80%, rgba(168, 85, 247, 0.04), transparent 50%);
-            pointer-events: none
+            pointer-events: none;
+            z-index: 0
         }
 
         .header {
             position: relative;
             z-index: 1;
-            padding: 1.2rem 2rem;
+            padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -66,29 +70,231 @@
         }
 
         .header p {
-            font-size: .75rem;
+            font-size: .72rem;
             color: var(--dim);
             margin-top: 2px
         }
 
-        .demo-badge {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--yellow);
-            padding: 4px 12px;
-            border-radius: 9999px;
-            font-size: .72rem;
-            font-weight: 600
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px
         }
 
+        .conn-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--red);
+            transition: all .3s
+        }
+
+        .conn-dot.on {
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green);
+            animation: pulse 2s infinite
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        .conn-text {
+            font-size: .75rem;
+            color: var(--dim)
+        }
+
+        /* Connect Panel */
+        .connect-panel {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1.5rem
+        }
+
+        .connect-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(10px)
+        }
+
+        .connect-card h2 {
+            font-size: 1.1rem;
+            color: var(--cyan);
+            margin-bottom: .3rem
+        }
+
+        .connect-card .sub {
+            font-size: .8rem;
+            color: var(--dim);
+            margin-bottom: 1.5rem
+        }
+
+        .connect-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem
+        }
+
+        .connect-input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg2);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .85rem;
+            outline: none;
+            transition: border-color .3s
+        }
+
+        .connect-input:focus {
+            border-color: var(--cyan)
+        }
+
+        .connect-input::placeholder {
+            color: var(--dim)
+        }
+
+        .connect-btn {
+            padding: 10px 24px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            font-size: .85rem;
+            cursor: pointer;
+            transition: all .3s
+        }
+
+        .connect-btn.primary {
+            background: linear-gradient(135deg, var(--cyan), var(--blue));
+            color: #0a0e17
+        }
+
+        .connect-btn.primary:hover {
+            box-shadow: 0 0 20px rgba(34, 211, 238, .3);
+            transform: translateY(-1px)
+        }
+
+        .connect-btn.danger {
+            background: rgba(239, 68, 68, .15);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, .3)
+        }
+
+        .connect-btn.danger:hover {
+            background: rgba(239, 68, 68, .25)
+        }
+
+        .connect-btn.secondary {
+            background: var(--bg2);
+            color: var(--sec);
+            border: 1px solid var(--border)
+        }
+
+        .connect-btn.secondary:hover {
+            border-color: var(--cyan);
+            color: var(--cyan)
+        }
+
+        .quick-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: .5rem
+        }
+
+        .quick-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--sec);
+            font-size: .72rem;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all .3s
+        }
+
+        .quick-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            background: rgba(34, 211, 238, .05)
+        }
+
+        .steps {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(34, 211, 238, .03);
+            border: 1px solid rgba(34, 211, 238, .15);
+            border-radius: 10px
+        }
+
+        .steps h3 {
+            font-size: .82rem;
+            color: var(--cyan);
+            margin-bottom: .8rem
+        }
+
+        .step {
+            display: flex;
+            gap: 10px;
+            margin-bottom: .6rem;
+            font-size: .78rem;
+            color: var(--sec);
+            line-height: 1.5
+        }
+
+        .step-num {
+            background: rgba(34, 211, 238, .15);
+            color: var(--cyan);
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: .7rem;
+            flex-shrink: 0
+        }
+
+        .step code {
+            background: var(--bg2);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            color: var(--green)
+        }
+
+        /* Dashboard Grid */
         .dashboard {
             position: relative;
             z-index: 1;
-            padding: 1.2rem;
-            display: grid;
+            padding: 1rem;
+            display: none;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
             max-width: 1600px;
             margin: 0 auto
+        }
+
+        .dashboard.active {
+            display: grid
         }
 
         .card {
@@ -96,33 +302,39 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 1rem;
-            backdrop-filter: blur(10px)
+            backdrop-filter: blur(10px);
+            transition: border-color .3s
         }
 
-        .card-header {
+        .card:hover {
+            border-color: rgba(34, 211, 238, .3)
+        }
+
+        .card-h {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: .8rem
         }
 
-        .card-title {
-            font-size: .8rem;
+        .card-t {
+            font-size: .78rem;
             font-weight: 600;
-            color: #9ca3af;
+            color: var(--sec);
             text-transform: uppercase;
             letter-spacing: .05em
         }
 
         .badge {
-            font-size: .68rem;
+            font-size: .66rem;
             padding: 2px 8px;
             border-radius: 9999px;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace
         }
 
-        .stats-row {
+        /* Stats */
+        .stats {
             grid-column: 1/-1;
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -133,30 +345,126 @@
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: .8rem 1rem;
-            text-align: center
+            padding: .7rem 1rem;
+            text-align: center;
+            transition: transform .3s
         }
 
-        .stat-label {
-            font-size: .65rem;
+        .stat:hover {
+            transform: translateY(-2px)
+        }
+
+        .stat-l {
+            font-size: .62rem;
             color: var(--dim);
             text-transform: uppercase;
             letter-spacing: .08em;
-            margin-bottom: 3px
+            margin-bottom: 2px
         }
 
-        .stat-value {
-            font-size: 1.5rem;
+        .stat-v {
+            font-size: 1.4rem;
             font-weight: 700;
             font-family: 'JetBrains Mono', monospace
         }
 
-        .stat-sub {
-            font-size: .65rem;
+        .stat-s {
+            font-size: .62rem;
             color: var(--dim);
             margin-top: 2px
         }
 
+        /* Controls */
+        .controls {
+            grid-column: 1/-1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap
+        }
+
+        .ctrl-label {
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--sec);
+            white-space: nowrap
+        }
+
+        .slider-wrap {
+            flex: 1;
+            min-width: 200px;
+            position: relative
+        }
+
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 2px;
+            margin-bottom: 3px
+        }
+
+        .slider-mark {
+            font-size: .58rem;
+            color: var(--dim);
+            text-align: center
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text);
+            border: 2px solid var(--cyan);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(34, 211, 238, .4)
+        }
+
+        .slider-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--cyan);
+            min-width: 70px;
+            text-align: right
+        }
+
+        .auto-btn {
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--sec);
+            font-size: .78rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all .3s
+        }
+
+        .auto-btn.on {
+            background: rgba(34, 211, 238, .15);
+            border-color: var(--cyan);
+            color: var(--cyan);
+            box-shadow: 0 0 12px rgba(34, 211, 238, .2)
+        }
+
+        /* Servers */
         .servers {
             grid-column: 1/-1;
             display: grid;
@@ -168,10 +476,11 @@
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: .8rem;
+            padding: .7rem;
             text-align: center;
             position: relative;
-            overflow: hidden
+            overflow: hidden;
+            transition: all .3s
         }
 
         .srv::before {
@@ -200,66 +509,43 @@
             background: var(--purple)
         }
 
-        .srv-name {
-            font-size: .8rem;
-            font-weight: 600;
-            margin-bottom: 2px
+        .srv.active {
+            border-color: rgba(34, 211, 238, .5);
+            box-shadow: 0 0 15px rgba(34, 211, 238, .1)
         }
 
-        .srv-detail {
-            font-size: .65rem;
+        .srv-n {
+            font-size: .78rem;
+            font-weight: 600;
+            margin-bottom: 1px
+        }
+
+        .srv-d {
+            font-size: .62rem;
             color: var(--dim)
         }
 
-        .srv-count {
-            font-size: 1.6rem;
+        .srv-c {
+            font-size: 1.5rem;
             font-weight: 700;
             font-family: 'JetBrains Mono', monospace;
-            margin: 6px 0 2px
+            margin: 5px 0 1px
         }
 
-        .srv-pct {
-            font-size: .7rem;
-            color: #9ca3af
+        .srv-p {
+            font-size: .68rem;
+            color: var(--sec)
         }
 
+        /* Charts */
         .chart-box {
             position: relative;
             height: 200px
         }
 
-        .info-box {
-            grid-column: 1/-1;
-            background: rgba(34, 211, 238, 0.05);
-            border: 1px solid rgba(34, 211, 238, 0.2);
-            border-radius: 12px;
-            padding: 1.2rem;
-            text-align: center
-        }
-
-        .info-box h2 {
-            font-size: 1rem;
-            color: var(--cyan);
-            margin-bottom: .5rem
-        }
-
-        .info-box p {
-            font-size: .82rem;
-            color: #9ca3af;
-            line-height: 1.6
-        }
-
-        .info-box code {
-            background: rgba(17, 24, 39, 0.8);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: .78rem;
-            color: var(--green)
-        }
-
-        .feed {
-            max-height: 250px;
+        /* Feed */
+        .feed-wrap {
+            max-height: 300px;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--border) transparent
@@ -270,220 +556,450 @@
             grid-template-columns: 30px 1fr 120px 80px;
             gap: 8px;
             align-items: center;
-            padding: 6px 10px;
-            border-bottom: 1px solid rgba(55, 65, 81, 0.3);
-            font-size: .78rem
+            padding: 5px 10px;
+            border-bottom: 1px solid rgba(55, 65, 81, .3);
+            font-size: .76rem;
+            animation: fadeIn .3s
         }
 
-        .feed-id {
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .f-id {
             font-family: 'JetBrains Mono', monospace;
             color: var(--dim);
-            font-size: .72rem
+            font-size: .7rem
         }
 
-        .feed-task {
+        .f-task {
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis
         }
 
-        .feed-srv {
+        .f-srv {
             font-weight: 600;
-            font-size: .72rem;
+            font-size: .7rem;
             padding: 2px 8px;
             border-radius: 4px;
             text-align: center
         }
 
-        .feed-srv.l {
+        .f-srv.l {
             background: rgba(245, 158, 11, .15);
             color: var(--yellow)
         }
 
-        .feed-srv.e1 {
+        .f-srv.e1 {
             background: rgba(34, 211, 238, .15);
             color: var(--cyan)
         }
 
-        .feed-srv.e2 {
+        .f-srv.e2 {
             background: rgba(59, 130, 246, .15);
             color: var(--blue)
         }
 
-        .feed-srv.e3 {
+        .f-srv.e3 {
             background: rgba(168, 85, 247, .15);
             color: var(--purple)
         }
 
-        .feed-time {
+        .f-t {
             font-family: 'JetBrains Mono', monospace;
-            color: #9ca3af;
+            color: var(--sec);
             text-align: right;
-            font-size: .72rem
+            font-size: .7rem
         }
 
-        a {
+        .waiting {
+            text-align: center;
+            padding: 2rem;
+            color: var(--dim)
+        }
+
+        .waiting-icon {
+            font-size: 2rem;
+            margin-bottom: .5rem;
+            animation: float 3s ease-in-out infinite
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0)
+            }
+
+            50% {
+                transform: translateY(-6px)
+            }
+        }
+
+        /* Task Buttons */
+        .task-btns {
+            grid-column: 1/-1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .task-btns .label {
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--sec);
+            margin-right: 8px
+        }
+
+        .task-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--sec);
+            font-size: .74rem;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all .3s
+        }
+
+        .task-btn:hover {
+            border-color: var(--cyan);
             color: var(--cyan);
-            text-decoration: none
+            background: rgba(34, 211, 238, .05)
         }
 
-        a:hover {
-            text-decoration: underline
+        .task-btn.env {
+            border-color: rgba(245, 158, 11, .3);
+            color: var(--yellow)
+        }
+
+        .task-btn.env:hover {
+            background: rgba(245, 158, 11, .1);
+            border-color: var(--yellow)
+        }
+
+        .task-btn.stress {
+            border-color: rgba(239, 68, 68, .3);
+            color: var(--red)
+        }
+
+        .task-btn.stress:hover {
+            background: rgba(239, 68, 68, .1);
+            border-color: var(--red)
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px
         }
     </style>
 </head>
 
 <body>
+
     <div class="header">
         <div>
-            <h1>RS-PLO Live Dashboard</h1>
-            <p>Multi-Edge Real-Time Task Offloading Visualization</p>
+            <h1>RS-PLO Edge Dashboard</h1>
+            <p>Remote Control Panel — Connect to Your Local Edge Server</p>
         </div>
-        <span class="demo-badge">STATIC DEMO</span>
+        <div class="header-right">
+            <button class="connect-btn secondary" id="disconnectBtn"
+                style="display:none;font-size:.72rem;padding:4px 12px" onclick="disconnect()">Disconnect</button>
+            <div style="display:flex;align-items:center;gap:8px">
+                <div class="conn-dot" id="dot"></div>
+                <span class="conn-text" id="connText">Not Connected</span>
+            </div>
+        </div>
     </div>
-    <div class="dashboard">
-        <div class="info-box">
-            <h2>This is a Static Preview</h2>
-            <p>The full interactive dashboard requires the Python backend for real-time SSE data.<br>
-                Clone the repo and run <code>python dashboard.py</code> then open
-                <code>http://localhost:8080</code><br><br>
-                Below is a snapshot of what the live dashboard looks like with sample data.</p>
-        </div>
 
-        <div class="stats-row">
-            <div class="stat">
-                <div class="stat-label">Tasks</div>
-                <div class="stat-value" style="color:var(--cyan)">47</div>
-                <div class="stat-sub">total</div>
+    <!-- Connect Panel -->
+    <div class="connect-panel" id="connectPanel">
+        <div class="connect-card">
+            <h2>Connect to Your Edge Server</h2>
+            <p class="sub">Enter the URL of your running RS-PLO dashboard server</p>
+
+            <div class="connect-row">
+                <input class="connect-input" id="serverUrl" type="text"
+                    placeholder="http://localhost:8080  or  https://your-tunnel-url.ngrok.io"
+                    value="http://localhost:8080">
+                <button class="connect-btn primary" id="connectBtn" onclick="connectToServer()">Connect</button>
             </div>
-            <div class="stat">
-                <div class="stat-label">Queue Q(t)</div>
-                <div class="stat-value" style="color:var(--blue)">4.5M</div>
-                <div class="stat-sub">bits</div>
+
+            <div class="quick-btns">
+                <button class="quick-btn" onclick="setUrl('http://localhost:8080')">localhost:8080</button>
+                <button class="quick-btn" onclick="setUrl('http://localhost:3000')">localhost:3000</button>
             </div>
-            <div class="stat">
-                <div class="stat-label">Volatility Z(t)</div>
-                <div class="stat-value" style="color:var(--red)">3.241</div>
-                <div class="stat-sub">channel risk</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Control V(t)</div>
-                <div class="stat-value" style="color:var(--green)">0.15</div>
-                <div class="stat-sub">energy weight</div>
-            </div>
-            <div class="stat">
-                <div class="stat-label">Offload Ratio</div>
-                <div class="stat-value" style="color:var(--purple)">81%</div>
-                <div class="stat-sub">to edge</div>
+
+            <div class="steps">
+                <h3>How to Connect</h3>
+                <div class="step"><span class="step-num">1</span><span>Run <code>python dashboard.py</code> on your
+                        machine — starts edge servers + dashboard</span></div>
+                <div class="step"><span class="step-num">2</span><span>For remote access, run
+                        <code>npx -y localtunnel --port 8080</code> to get a public URL</span></div>
+                <div class="step"><span class="step-num">3</span><span>Paste the tunnel URL above and click
+                        <strong>Connect</strong></span></div>
+                <div class="step"><span class="step-num">4</span><span>Use the buttons below to send tasks, change
+                        distance, and control your edge servers!</span></div>
             </div>
         </div>
+    </div>
 
+    <!-- Live Dashboard (hidden until connected) -->
+    <div class="dashboard" id="dashboard">
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-l">Tasks</div>
+                <div class="stat-v" id="sT" style="color:var(--cyan)">0</div>
+                <div class="stat-s">total</div>
+            </div>
+            <div class="stat">
+                <div class="stat-l">Queue Q(t)</div>
+                <div class="stat-v" id="sQ" style="color:var(--blue)">0</div>
+                <div class="stat-s">bits</div>
+            </div>
+            <div class="stat">
+                <div class="stat-l">Volatility Z(t)</div>
+                <div class="stat-v" id="sZ" style="color:var(--red)">0.000</div>
+                <div class="stat-s">risk</div>
+            </div>
+            <div class="stat">
+                <div class="stat-l">Control V(t)</div>
+                <div class="stat-v" id="sV" style="color:var(--green)">10.00</div>
+                <div class="stat-s">weight</div>
+            </div>
+            <div class="stat">
+                <div class="stat-l">Offload %</div>
+                <div class="stat-v" id="sO" style="color:var(--purple)">0%</div>
+                <div class="stat-s">to edge</div>
+            </div>
+        </div>
+
+        <!-- Remote Task Buttons -->
+        <div class="task-btns">
+            <span class="label">Send Task:</span>
+            <button class="task-btn" onclick="sendCmd('matrix 80')">Matrix 80</button>
+            <button class="task-btn" onclick="sendCmd('matrix 120')">Matrix 120</button>
+            <button class="task-btn" onclick="sendCmd('hash 200')">Hash 200KB</button>
+            <button class="task-btn" onclick="sendCmd('hash 500')">Hash 500KB</button>
+            <button class="task-btn" onclick="sendCmd('prime 9999991')">Prime 10M</button>
+            <button class="task-btn" onclick="sendCmd('sort 50000')">Sort 50K</button>
+            <button class="task-btn" onclick="sendCmd('encrypt Dashboard remote test')">Encrypt</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+            <button class="task-btn env" onclick="sendCmd('move close')">Move Close</button>
+            <button class="task-btn env" onclick="sendCmd('move far')">Move Far</button>
+            <button class="task-btn env" onclick="sendCmd('tunnel')">Tunnel</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+            <button class="task-btn stress" onclick="sendCmd('burst')">Burst (5x)</button>
+            <button class="auto-btn" id="autoBtn" onclick="toggleAuto()">Auto-Run: OFF</button>
+        </div>
+
+        <!-- Distance Slider -->
+        <div class="controls">
+            <span class="ctrl-label">Distance</span>
+            <div class="slider-wrap">
+                <div class="slider-marks"><span class="slider-mark">30m</span><span
+                        class="slider-mark">Edge-1<br>150m</span><span class="slider-mark">Edge-2<br>600m</span><span
+                        class="slider-mark">Edge-3<br>1200m</span><span class="slider-mark">2500m</span></div>
+                <input type="range" id="distSlider" min="30" max="2500" value="300" oninput="onDist(this.value)">
+            </div>
+            <span class="slider-val" id="distVal">300m</span>
+        </div>
+
+        <!-- Servers -->
         <div class="servers">
             <div class="srv l">
-                <div class="srv-name" style="color:var(--yellow)">LOCAL</div>
-                <div class="srv-detail">IoT MCU</div>
-                <div class="srv-count" style="color:var(--yellow)">9</div>
-                <div class="srv-pct">19%</div>
+                <div class="srv-n" style="color:var(--yellow)">LOCAL</div>
+                <div class="srv-d">IoT MCU</div>
+                <div class="srv-c" id="cL" style="color:var(--yellow)">0</div>
+                <div class="srv-p" id="pL">0%</div>
             </div>
             <div class="srv e1">
-                <div class="srv-name" style="color:var(--cyan)">Edge-1 (Near)</div>
-                <div class="srv-detail">150m</div>
-                <div class="srv-count" style="color:var(--cyan)">28</div>
-                <div class="srv-pct">60%</div>
+                <div class="srv-n" style="color:var(--cyan)">Edge-1 (Near)</div>
+                <div class="srv-d">150m</div>
+                <div class="srv-c" id="cE1" style="color:var(--cyan)">0</div>
+                <div class="srv-p" id="pE1">0%</div>
             </div>
             <div class="srv e2">
-                <div class="srv-name" style="color:var(--blue)">Edge-2 (Mid)</div>
-                <div class="srv-detail">600m</div>
-                <div class="srv-count" style="color:var(--blue)">7</div>
-                <div class="srv-pct">15%</div>
+                <div class="srv-n" style="color:var(--blue)">Edge-2 (Mid)</div>
+                <div class="srv-d">600m</div>
+                <div class="srv-c" id="cE2" style="color:var(--blue)">0</div>
+                <div class="srv-p" id="pE2">0%</div>
             </div>
             <div class="srv e3">
-                <div class="srv-name" style="color:var(--purple)">Edge-3 (Far)</div>
-                <div class="srv-detail">1200m</div>
-                <div class="srv-count" style="color:var(--purple)">3</div>
-                <div class="srv-pct">6%</div>
+                <div class="srv-n" style="color:var(--purple)">Edge-3 (Far)</div>
+                <div class="srv-d">1200m</div>
+                <div class="srv-c" id="cE3" style="color:var(--purple)">0</div>
+                <div class="srv-p" id="pE3">0%</div>
             </div>
         </div>
 
+        <!-- Charts -->
         <div class="card">
-            <div class="card-header"><span class="card-title">Queue Q(t) & Volatility Z(t)</span><span class="badge"
-                    style="background:rgba(59,130,246,.15);color:var(--blue)">DEMO</span></div>
+            <div class="card-h"><span class="card-t">Queue Q(t) & Volatility Z(t)</span><span class="badge"
+                    style="background:rgba(59,130,246,.15);color:var(--blue)">LIVE</span></div>
             <div class="chart-box"><canvas id="c1"></canvas></div>
         </div>
         <div class="card">
-            <div class="card-header"><span class="card-title">Control V(t) & Energy</span><span class="badge"
-                    style="background:rgba(16,185,129,.15);color:var(--green)">DEMO</span></div>
+            <div class="card-h"><span class="card-t">Control V(t) & Energy</span><span class="badge"
+                    style="background:rgba(16,185,129,.15);color:var(--green)">ADAPTIVE</span></div>
             <div class="chart-box"><canvas id="c2"></canvas></div>
         </div>
         <div class="card">
-            <div class="card-header"><span class="card-title">Latency per Task</span><span class="badge"
+            <div class="card-h"><span class="card-t">Latency per Task</span><span class="badge"
                     style="background:rgba(249,115,22,.15);color:var(--orange)">ms</span></div>
             <div class="chart-box"><canvas id="c3"></canvas></div>
         </div>
         <div class="card">
-            <div class="card-header"><span class="card-title">Server Distribution</span><span class="badge"
+            <div class="card-h"><span class="card-t">Server Distribution</span><span class="badge"
                     style="background:rgba(168,85,247,.15);color:var(--purple)">PIE</span></div>
             <div class="chart-box"><canvas id="c4"></canvas></div>
         </div>
 
+        <!-- Feed -->
         <div class="card" style="grid-column:1/-1">
-            <div class="card-header"><span class="card-title">Decision Feed</span><span class="badge"
-                    style="background:rgba(34,211,238,.15);color:var(--cyan)">47 tasks</span></div>
-            <div class="feed" id="feed"></div>
+            <div class="card-h"><span class="card-t">Decision Feed</span><span class="badge" id="feedBadge"
+                    style="background:rgba(34,211,238,.15);color:var(--cyan)">0</span></div>
+            <div class="feed-wrap" id="feed">
+                <div class="waiting">
+                    <div class="waiting-icon">&#9889;</div>
+                    <div>Send a task using the buttons above</div>
+                </div>
+            </div>
         </div>
     </div>
-    <script>
-        Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = 'rgba(55,65,81,0.3)'; Chart.defaults.font.family = "'Inter',sans-serif";
-        const cc = { cyan: 'rgba(34,211,238,1)', blue: 'rgba(59,130,246,1)', red: 'rgba(239,68,68,1)', green: 'rgba(16,185,129,1)', yellow: 'rgba(245,158,11,1)', purple: 'rgba(168,85,247,1)', orange: 'rgba(249,115,22,1)' };
 
-        // Generate sample data
-        const n = 47; const labels = Array.from({ length: n }, (_, i) => '#' + (i + 1));
-        const Q = []; const Z = []; const V = []; const E = []; const L = []; const D = [];
-        let q = 0, z = 0;
-        for (let i = 0; i < n; i++) {
-            const bits = Math.random() * 800000 + 100000; q = Math.max(q - Math.random() * 500000, 0) + bits;
-            const err = Math.random() * 3; z = Math.max(z - 0.2, 0) + err;
-            const v = 10 * Math.exp(-2 * z); const e = (Math.random() * 50 + 5);
-            const d = v > 2 ? (Math.random() > 0.3 ? 1 : 0) : (Math.random() > 0.5 ? 0 : (Math.random() > 0.5 ? 2 : 3));
-            const lat = d === 0 ? Math.random() * 5 + 0.5 : Math.random() * 30 + 1;
-            Q.push(q / 1e6); Z.push(z); V.push(v); E.push(e); L.push(lat); D.push(d);
+    <script>
+        const S = { tasks: [], sc: { local: 0, edge1: 0, edge2: 0, edge3: 0 }, Qh: [], Zh: [], Vh: [], Eh: [], Lh: [], labels: [], max: 80, sse: null, auto: false, autoId: null, url: '' };
+        const C = { cyan: 'rgba(34,211,238,1)', blue: 'rgba(59,130,246,1)', red: 'rgba(239,68,68,1)', green: 'rgba(16,185,129,1)', yellow: 'rgba(245,158,11,1)', purple: 'rgba(168,85,247,1)', orange: 'rgba(249,115,22,1)' };
+        Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = 'rgba(55,65,81,0.3)'; Chart.defaults.font.family = "'Inter',sans-serif";
+        const co = { responsive: true, maintainAspectRatio: false, animation: { duration: 200 }, plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } };
+        const c1 = new Chart(document.getElementById('c1'), { type: 'line', data: { labels: [], datasets: [{ label: 'Q(t)/1M', data: [], borderColor: C.blue, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yQ' }, { label: 'Z(t)', data: [], borderColor: C.red, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yZ' }] }, options: { ...co, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false }, yQ: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yZ: { position: 'right', grid: { display: false } } } } });
+        const c2 = new Chart(document.getElementById('c2'), { type: 'line', data: { labels: [], datasets: [{ label: 'V(t)', data: [], borderColor: C.green, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yV' }, { label: 'Energy (mJ)', data: [], borderColor: C.yellow, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yE' }] }, options: { ...co, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false }, yV: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yE: { position: 'right', grid: { display: false } } } } });
+        const c3 = new Chart(document.getElementById('c3'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Latency', data: [], backgroundColor: [], borderRadius: 4, borderSkipped: false }] }, options: { ...co, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(55,65,81,0.2)' } } } } });
+        const c4 = new Chart(document.getElementById('c4'), { type: 'doughnut', data: { labels: ['LOCAL', 'Edge-1', 'Edge-2', 'Edge-3'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: [C.yellow, C.cyan, C.blue, C.purple], borderWidth: 0, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } } });
+
+        function fmtN(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : n.toFixed(0) }
+        function scls(id) { return ['local', 'edge1', 'edge2', 'edge3'][id] || 'local' }
+        function barC(id) { return [C.yellow, C.cyan, C.blue, C.purple][id] || C.yellow }
+        function setUrl(u) { document.getElementById('serverUrl').value = u }
+
+        function connectToServer() {
+            const url = document.getElementById('serverUrl').value.replace(/\/$/, '');
+            if (!url) return;
+            S.url = url;
+            document.getElementById('connText').textContent = 'Connecting...';
+            try {
+                if (S.sse) S.sse.close();
+                S.sse = new EventSource(url + '/events');
+                S.sse.addEventListener('connected', () => {
+                    document.getElementById('dot').classList.add('on');
+                    document.getElementById('connText').textContent = 'Connected to ' + url;
+                    document.getElementById('connectPanel').style.display = 'none';
+                    document.getElementById('dashboard').classList.add('active');
+                    document.getElementById('disconnectBtn').style.display = '';
+                });
+                S.sse.addEventListener('task', (e) => {
+                    const t = JSON.parse(e.data); S.tasks.push(t);
+                    const k = scls(t.decision_id); S.sc[k] = (S.sc[k] || 0) + 1;
+                    updateStats(t); updateSrv(); addCharts(t); addFeed(t);
+                    if (t.distance) { document.getElementById('distSlider').value = Math.round(t.distance); document.getElementById('distVal').textContent = Math.round(t.distance) + 'm' }
+                });
+                S.sse.addEventListener('state', (e) => {
+                    const s = JSON.parse(e.data);
+                    document.getElementById('sQ').textContent = fmtN(s.Q);
+                    document.getElementById('sZ').textContent = s.Z.toFixed(3);
+                    document.getElementById('sV').textContent = s.V.toFixed(2);
+                    document.getElementById('sT').textContent = s.task_count;
+                });
+                S.sse.onerror = () => {
+                    document.getElementById('dot').classList.remove('on');
+                    document.getElementById('connText').textContent = 'Connection lost — retrying...';
+                };
+            } catch (e) {
+                document.getElementById('connText').textContent = 'Failed: ' + e.message;
+            }
         }
 
-        const opts = { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } };
+        function disconnect() {
+            if (S.sse) S.sse.close(); S.sse = null;
+            if (S.autoId) clearInterval(S.autoId); S.auto = false;
+            document.getElementById('dot').classList.remove('on');
+            document.getElementById('connText').textContent = 'Disconnected';
+            document.getElementById('connectPanel').style.display = '';
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('disconnectBtn').style.display = 'none';
+            document.getElementById('autoBtn').textContent = 'Auto-Run: OFF';
+            document.getElementById('autoBtn').classList.remove('on');
+        }
 
-        new Chart(document.getElementById('c1'), {
-            type: 'line', data: {
-                labels, datasets: [
-                    { label: 'Q(t)/1M', data: Q, borderColor: cc.blue, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yQ' },
-                    { label: 'Z(t)', data: Z, borderColor: cc.red, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yZ' },
-                ]
-            }, options: { ...opts, scales: { x: { display: false }, yQ: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yZ: { position: 'right', grid: { display: false } } } }
-        });
-
-        new Chart(document.getElementById('c2'), {
-            type: 'line', data: {
-                labels, datasets: [
-                    { label: 'V(t)', data: V, borderColor: cc.green, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yV' },
-                    { label: 'Energy (mJ)', data: E, borderColor: cc.yellow, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yE' },
-                ]
-            }, options: { ...opts, scales: { x: { display: false }, yV: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yE: { position: 'right', grid: { display: false } } } }
-        });
-
-        const barColors = D.map(d => [cc.yellow, cc.cyan, cc.blue, cc.purple][d]);
-        new Chart(document.getElementById('c3'), { type: 'bar', data: { labels, datasets: [{ label: 'Latency', data: L, backgroundColor: barColors, borderRadius: 4 }] }, options: { ...opts, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(55,65,81,0.2)' } } } } });
-
-        new Chart(document.getElementById('c4'), { type: 'doughnut', data: { labels: ['LOCAL', 'Edge-1', 'Edge-2', 'Edge-3'], datasets: [{ data: [D.filter(d => d === 0).length, D.filter(d => d === 1).length, D.filter(d => d === 2).length, D.filter(d => d === 3).length], backgroundColor: [cc.yellow, cc.cyan, cc.blue, cc.purple], borderWidth: 0, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } } });
-
-        // Feed
-        const tasks = ['Matrix 80x80', 'SHA-256 200KB', 'Factorize 9999991', 'Sort 50000', 'Encrypt text', 'Matrix 120x120', 'Hash 500KB'];
-        const srvNames = ['LOCAL', 'Edge-1 (Near)', 'Edge-2 (Mid)', 'Edge-3 (Far)'];
-        const srvClasses = ['l', 'e1', 'e2', 'e3'];
-        const feed = document.getElementById('feed');
-        for (let i = n - 1; i >= Math.max(0, n - 20); i--) {
-            const div = document.createElement('div'); div.className = 'feed-item';
-            div.innerHTML = `<span class="feed-id">#${i + 1}</span><span class="feed-task">${tasks[i % tasks.length]}</span><span class="feed-srv ${srvClasses[D[i]]}">${srvNames[D[i]]}</span><span class="feed-time">${L[i].toFixed(2)}ms</span>`;
-            feed.appendChild(div);
+        function sendCmd(cmd) {
+            if (!S.url) return;
+            fetch(S.url + '/run_command?cmd=' + encodeURIComponent(cmd), { mode: 'cors' }).catch(() => {
+                fetch(S.url + '/auto_task', { mode: 'cors' }).catch(() => { });
+            });
+        }
+        function onDist(v) {
+            document.getElementById('distVal').textContent = v + 'm';
+            if (S.url) fetch(S.url + '/set_distance?d=' + v, { mode: 'cors' }).catch(() => { });
+        }
+        function toggleAuto() {
+            S.auto = !S.auto; const b = document.getElementById('autoBtn');
+            if (S.auto) { b.textContent = 'Auto-Run: ON'; b.classList.add('on'); S.autoId = setInterval(() => { if (S.url) fetch(S.url + '/auto_task', { mode: 'cors' }).catch(() => { }) }, 2000) }
+            else { b.textContent = 'Auto-Run: OFF'; b.classList.remove('on'); clearInterval(S.autoId) }
+        }
+        function updateStats(t) {
+            document.getElementById('sT').textContent = S.tasks.length;
+            document.getElementById('sQ').textContent = fmtN(t.Q);
+            document.getElementById('sZ').textContent = t.Z.toFixed(3);
+            document.getElementById('sV').textContent = t.V.toFixed(2);
+            const o = S.tasks.filter(x => x.decision_id > 0).length;
+            document.getElementById('sO').textContent = Math.round(o / S.tasks.length * 100) + '%';
+        }
+        function updateSrv() {
+            const n = S.tasks.length || 1;
+            for (const [k, c] of Object.entries(S.sc)) { const id = k === 'local' ? 'L' : k === 'edge1' ? 'E1' : k === 'edge2' ? 'E2' : 'E3'; document.getElementById('c' + id).textContent = c; document.getElementById('p' + id).textContent = Math.round(c / n * 100) + '%' }
+            document.querySelectorAll('.srv').forEach(e => e.classList.remove('active'));
+            if (S.tasks.length) { const l = S.tasks[S.tasks.length - 1]; const el = document.querySelector('.srv.' + scls(l.decision_id)); if (el) el.classList.add('active') }
+        }
+        function addCharts(t) {
+            const l = '#' + t.id; S.labels.push(l); S.Qh.push(t.Q / 1e6); S.Zh.push(t.Z); S.Vh.push(t.V); S.Eh.push(t.energy_mJ); S.Lh.push(t.exec_ms);
+            if (S.labels.length > S.max) { S.labels.shift(); S.Qh.shift(); S.Zh.shift(); S.Vh.shift(); S.Eh.shift(); S.Lh.shift() }
+            c1.data.labels = S.labels; c1.data.datasets[0].data = S.Qh; c1.data.datasets[1].data = S.Zh; c1.update();
+            c2.data.labels = S.labels; c2.data.datasets[0].data = S.Vh; c2.data.datasets[1].data = S.Eh; c2.update();
+            c3.data.labels = S.labels; c3.data.datasets[0].data = S.Lh; c3.data.datasets[0].backgroundColor = S.tasks.map(x => barC(x.decision_id)); c3.update();
+            c4.data.datasets[0].data = [S.sc.local || 0, S.sc.edge1 || 0, S.sc.edge2 || 0, S.sc.edge3 || 0]; c4.update();
+        }
+        function addFeed(t) {
+            const f = document.getElementById('feed'); if (S.tasks.length === 1) f.innerHTML = '';
+            const d = document.createElement('div'); d.className = 'feed-item';
+            d.innerHTML = `<span class="f-id">#${t.id}</span><span class="f-task">${t.label}</span><span class="f-srv ${scls(t.decision_id)}">${t.decision}</span><span class="f-t">${t.exec_ms.toFixed(2)}ms</span>`;
+            f.insertBefore(d, f.firstChild); document.getElementById('feedBadge').textContent = S.tasks.length + ' tasks';
+            while (f.children.length > 50) f.removeChild(f.lastChild);
         }
     </script>
 </body>
