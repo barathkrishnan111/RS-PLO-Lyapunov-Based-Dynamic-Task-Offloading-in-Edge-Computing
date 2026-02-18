@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RS-PLO Dashboard Demo — Static Preview</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #0a0e17;
+            --card: rgba(17, 24, 39, 0.8);
+            --border: rgba(55, 65, 81, 0.5);
+            --text: #f3f4f6;
+            --dim: #6b7280;
+            --cyan: #22d3ee;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --orange: #f97316
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(at 20% 20%, rgba(34, 211, 238, 0.04), transparent 50%), radial-gradient(at 80% 80%, rgba(168, 85, 247, 0.04), transparent 50%);
+            pointer-events: none
+        }
+
+        .header {
+            position: relative;
+            z-index: 1;
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            background: rgba(10, 14, 23, 0.9)
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        .header p {
+            font-size: .75rem;
+            color: var(--dim);
+            margin-top: 2px
+        }
+
+        .demo-badge {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--yellow);
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: .72rem;
+            font-weight: 600
+        }
+
+        .dashboard {
+            position: relative;
+            z-index: 1;
+            padding: 1.2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            max-width: 1600px;
+            margin: 0 auto
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(10px)
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: .8rem
+        }
+
+        .card-title {
+            font-size: .8rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: .05em
+        }
+
+        .badge {
+            font-size: .68rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace
+        }
+
+        .stats-row {
+            grid-column: 1/-1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: .8rem
+        }
+
+        .stat {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: .8rem 1rem;
+            text-align: center
+        }
+
+        .stat-label {
+            font-size: .65rem;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 3px
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace
+        }
+
+        .stat-sub {
+            font-size: .65rem;
+            color: var(--dim);
+            margin-top: 2px
+        }
+
+        .servers {
+            grid-column: 1/-1;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: .8rem
+        }
+
+        .srv {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: .8rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden
+        }
+
+        .srv::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 12px 12px 0 0
+        }
+
+        .srv.l::before {
+            background: var(--yellow)
+        }
+
+        .srv.e1::before {
+            background: var(--cyan)
+        }
+
+        .srv.e2::before {
+            background: var(--blue)
+        }
+
+        .srv.e3::before {
+            background: var(--purple)
+        }
+
+        .srv-name {
+            font-size: .8rem;
+            font-weight: 600;
+            margin-bottom: 2px
+        }
+
+        .srv-detail {
+            font-size: .65rem;
+            color: var(--dim)
+        }
+
+        .srv-count {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 6px 0 2px
+        }
+
+        .srv-pct {
+            font-size: .7rem;
+            color: #9ca3af
+        }
+
+        .chart-box {
+            position: relative;
+            height: 200px
+        }
+
+        .info-box {
+            grid-column: 1/-1;
+            background: rgba(34, 211, 238, 0.05);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center
+        }
+
+        .info-box h2 {
+            font-size: 1rem;
+            color: var(--cyan);
+            margin-bottom: .5rem
+        }
+
+        .info-box p {
+            font-size: .82rem;
+            color: #9ca3af;
+            line-height: 1.6
+        }
+
+        .info-box code {
+            background: rgba(17, 24, 39, 0.8);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .78rem;
+            color: var(--green)
+        }
+
+        .feed {
+            max-height: 250px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent
+        }
+
+        .feed-item {
+            display: grid;
+            grid-template-columns: 30px 1fr 120px 80px;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(55, 65, 81, 0.3);
+            font-size: .78rem
+        }
+
+        .feed-id {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--dim);
+            font-size: .72rem
+        }
+
+        .feed-task {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .feed-srv {
+            font-weight: 600;
+            font-size: .72rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-align: center
+        }
+
+        .feed-srv.l {
+            background: rgba(245, 158, 11, .15);
+            color: var(--yellow)
+        }
+
+        .feed-srv.e1 {
+            background: rgba(34, 211, 238, .15);
+            color: var(--cyan)
+        }
+
+        .feed-srv.e2 {
+            background: rgba(59, 130, 246, .15);
+            color: var(--blue)
+        }
+
+        .feed-srv.e3 {
+            background: rgba(168, 85, 247, .15);
+            color: var(--purple)
+        }
+
+        .feed-time {
+            font-family: 'JetBrains Mono', monospace;
+            color: #9ca3af;
+            text-align: right;
+            font-size: .72rem
+        }
+
+        a {
+            color: var(--cyan);
+            text-decoration: none
+        }
+
+        a:hover {
+            text-decoration: underline
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>RS-PLO Live Dashboard</h1>
+            <p>Multi-Edge Real-Time Task Offloading Visualization</p>
+        </div>
+        <span class="demo-badge">STATIC DEMO</span>
+    </div>
+    <div class="dashboard">
+        <div class="info-box">
+            <h2>This is a Static Preview</h2>
+            <p>The full interactive dashboard requires the Python backend for real-time SSE data.<br>
+                Clone the repo and run <code>python dashboard.py</code> then open
+                <code>http://localhost:8080</code><br><br>
+                Below is a snapshot of what the live dashboard looks like with sample data.</p>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat">
+                <div class="stat-label">Tasks</div>
+                <div class="stat-value" style="color:var(--cyan)">47</div>
+                <div class="stat-sub">total</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Queue Q(t)</div>
+                <div class="stat-value" style="color:var(--blue)">4.5M</div>
+                <div class="stat-sub">bits</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Volatility Z(t)</div>
+                <div class="stat-value" style="color:var(--red)">3.241</div>
+                <div class="stat-sub">channel risk</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Control V(t)</div>
+                <div class="stat-value" style="color:var(--green)">0.15</div>
+                <div class="stat-sub">energy weight</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Offload Ratio</div>
+                <div class="stat-value" style="color:var(--purple)">81%</div>
+                <div class="stat-sub">to edge</div>
+            </div>
+        </div>
+
+        <div class="servers">
+            <div class="srv l">
+                <div class="srv-name" style="color:var(--yellow)">LOCAL</div>
+                <div class="srv-detail">IoT MCU</div>
+                <div class="srv-count" style="color:var(--yellow)">9</div>
+                <div class="srv-pct">19%</div>
+            </div>
+            <div class="srv e1">
+                <div class="srv-name" style="color:var(--cyan)">Edge-1 (Near)</div>
+                <div class="srv-detail">150m</div>
+                <div class="srv-count" style="color:var(--cyan)">28</div>
+                <div class="srv-pct">60%</div>
+            </div>
+            <div class="srv e2">
+                <div class="srv-name" style="color:var(--blue)">Edge-2 (Mid)</div>
+                <div class="srv-detail">600m</div>
+                <div class="srv-count" style="color:var(--blue)">7</div>
+                <div class="srv-pct">15%</div>
+            </div>
+            <div class="srv e3">
+                <div class="srv-name" style="color:var(--purple)">Edge-3 (Far)</div>
+                <div class="srv-detail">1200m</div>
+                <div class="srv-count" style="color:var(--purple)">3</div>
+                <div class="srv-pct">6%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span class="card-title">Queue Q(t) & Volatility Z(t)</span><span class="badge"
+                    style="background:rgba(59,130,246,.15);color:var(--blue)">DEMO</span></div>
+            <div class="chart-box"><canvas id="c1"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">Control V(t) & Energy</span><span class="badge"
+                    style="background:rgba(16,185,129,.15);color:var(--green)">DEMO</span></div>
+            <div class="chart-box"><canvas id="c2"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">Latency per Task</span><span class="badge"
+                    style="background:rgba(249,115,22,.15);color:var(--orange)">ms</span></div>
+            <div class="chart-box"><canvas id="c3"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">Server Distribution</span><span class="badge"
+                    style="background:rgba(168,85,247,.15);color:var(--purple)">PIE</span></div>
+            <div class="chart-box"><canvas id="c4"></canvas></div>
+        </div>
+
+        <div class="card" style="grid-column:1/-1">
+            <div class="card-header"><span class="card-title">Decision Feed</span><span class="badge"
+                    style="background:rgba(34,211,238,.15);color:var(--cyan)">47 tasks</span></div>
+            <div class="feed" id="feed"></div>
+        </div>
+    </div>
+    <script>
+        Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = 'rgba(55,65,81,0.3)'; Chart.defaults.font.family = "'Inter',sans-serif";
+        const cc = { cyan: 'rgba(34,211,238,1)', blue: 'rgba(59,130,246,1)', red: 'rgba(239,68,68,1)', green: 'rgba(16,185,129,1)', yellow: 'rgba(245,158,11,1)', purple: 'rgba(168,85,247,1)', orange: 'rgba(249,115,22,1)' };
+
+        // Generate sample data
+        const n = 47; const labels = Array.from({ length: n }, (_, i) => '#' + (i + 1));
+        const Q = []; const Z = []; const V = []; const E = []; const L = []; const D = [];
+        let q = 0, z = 0;
+        for (let i = 0; i < n; i++) {
+            const bits = Math.random() * 800000 + 100000; q = Math.max(q - Math.random() * 500000, 0) + bits;
+            const err = Math.random() * 3; z = Math.max(z - 0.2, 0) + err;
+            const v = 10 * Math.exp(-2 * z); const e = (Math.random() * 50 + 5);
+            const d = v > 2 ? (Math.random() > 0.3 ? 1 : 0) : (Math.random() > 0.5 ? 0 : (Math.random() > 0.5 ? 2 : 3));
+            const lat = d === 0 ? Math.random() * 5 + 0.5 : Math.random() * 30 + 1;
+            Q.push(q / 1e6); Z.push(z); V.push(v); E.push(e); L.push(lat); D.push(d);
+        }
+
+        const opts = { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } };
+
+        new Chart(document.getElementById('c1'), {
+            type: 'line', data: {
+                labels, datasets: [
+                    { label: 'Q(t)/1M', data: Q, borderColor: cc.blue, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yQ' },
+                    { label: 'Z(t)', data: Z, borderColor: cc.red, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yZ' },
+                ]
+            }, options: { ...opts, scales: { x: { display: false }, yQ: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yZ: { position: 'right', grid: { display: false } } } }
+        });
+
+        new Chart(document.getElementById('c2'), {
+            type: 'line', data: {
+                labels, datasets: [
+                    { label: 'V(t)', data: V, borderColor: cc.green, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yV' },
+                    { label: 'Energy (mJ)', data: E, borderColor: cc.yellow, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, yAxisID: 'yE' },
+                ]
+            }, options: { ...opts, scales: { x: { display: false }, yV: { position: 'left', grid: { color: 'rgba(55,65,81,0.2)' } }, yE: { position: 'right', grid: { display: false } } } }
+        });
+
+        const barColors = D.map(d => [cc.yellow, cc.cyan, cc.blue, cc.purple][d]);
+        new Chart(document.getElementById('c3'), { type: 'bar', data: { labels, datasets: [{ label: 'Latency', data: L, backgroundColor: barColors, borderRadius: 4 }] }, options: { ...opts, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(55,65,81,0.2)' } } } } });
+
+        new Chart(document.getElementById('c4'), { type: 'doughnut', data: { labels: ['LOCAL', 'Edge-1', 'Edge-2', 'Edge-3'], datasets: [{ data: [D.filter(d => d === 0).length, D.filter(d => d === 1).length, D.filter(d => d === 2).length, D.filter(d => d === 3).length], backgroundColor: [cc.yellow, cc.cyan, cc.blue, cc.purple], borderWidth: 0, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6 } } } } });
+
+        // Feed
+        const tasks = ['Matrix 80x80', 'SHA-256 200KB', 'Factorize 9999991', 'Sort 50000', 'Encrypt text', 'Matrix 120x120', 'Hash 500KB'];
+        const srvNames = ['LOCAL', 'Edge-1 (Near)', 'Edge-2 (Mid)', 'Edge-3 (Far)'];
+        const srvClasses = ['l', 'e1', 'e2', 'e3'];
+        const feed = document.getElementById('feed');
+        for (let i = n - 1; i >= Math.max(0, n - 20); i--) {
+            const div = document.createElement('div'); div.className = 'feed-item';
+            div.innerHTML = `<span class="feed-id">#${i + 1}</span><span class="feed-task">${tasks[i % tasks.length]}</span><span class="feed-srv ${srvClasses[D[i]]}">${srvNames[D[i]]}</span><span class="feed-time">${L[i].toFixed(2)}ms</span>`;
+            feed.appendChild(div);
+        }
+    </script>
+</body>
+
+</html>

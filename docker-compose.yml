@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  rsplo-dashboard:
+    build: .
+    container_name: rsplo-dashboard
+    ports:
+      - "8080:8080"     # Dashboard UI
+      - "9999:9999"     # Edge-1 (Near)
+      - "10000:10000"   # Edge-2 (Mid)
+      - "10001:10001"   # Edge-3 (Far)
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  rsplo-experiment:
+    build: .
+    container_name: rsplo-experiment
+    command: ["python", "run_experiment.py"]
+    volumes:
+      - ./results:/app/results
+    profiles:
+      - experiment

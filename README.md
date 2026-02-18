@@ -1,29 +1,32 @@
-# ⚡ RS-PLO: Lyapunov-Based Dynamic Task Offloading in Edge Computing
+# RS-PLO: Lyapunov-Based Dynamic Task Offloading in Edge Computing
 
-> **Real-time, risk-sensitive task offloading using Lyapunov optimization — not a simulation, actual computation.**
+> **Real-time, risk-sensitive task offloading using Lyapunov optimization -- not a simulation, actual computation.**
 
-This project implements the **RS-PLO (Risk-Sensitive Predictive Lyapunov Optimization)** framework for dynamic task offloading in Mobile Edge Computing (MEC) environments. Every task is **actually executed** — either on your local device or offloaded to a real TCP edge server.
+This project implements the **RS-PLO (Risk-Sensitive Predictive Lyapunov Optimization)** framework for dynamic task offloading in Mobile Edge Computing (MEC) environments. Every task is **actually executed** -- either on your local device or offloaded to one of **3 real TCP edge servers** at different distances.
 
 Based on the paper: *"Lyapunov-Stable Dynamic Task Offloading in Non-Stationary Edge Environments: A Deterministic Drift-Plus-Penalty Framework"*
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [The RS-PLO Algorithm](#the-rs-plo-algorithm)
+- [Multi-Edge Server Selection](#multi-edge-server-selection)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Live Interactive Demo](#1-live-interactive-demo-demopy)
-  - [Automated Experiment](#2-automated-experiment-run_experimentpy)
-  - [Standalone Edge Server](#3-standalone-edge-server)
+  - [Live Dashboard](#1-live-dashboard-dashboardpy)
+  - [Interactive CLI Demo](#2-interactive-cli-demo-demopy)
+  - [Automated Experiment](#3-automated-experiment-run_experimentpy)
+  - [Standalone Edge Server](#4-standalone-edge-server)
 - [Supported Task Types](#supported-task-types)
 - [System Parameters](#system-parameters)
 - [Results and Analysis](#results-and-analysis)
 - [How the Decision Works](#how-the-decision-works)
 - [Technical Details](#technical-details)
+- [Docker](#docker)
 
 ---
 
@@ -48,21 +51,30 @@ The challenge: **wireless channels are unpredictable**. A good channel can sudde
 ## Architecture
 
 ```
-+------------------------+         TCP Socket          +------------------------+
-|   IoT Device (You)     | ---- Offload Tasks ---->   |   Edge Server (MEC)    |
-|                        |                              |                        |
-|  - RS-PLO Engine       |         OR                   |  - Matrix Multiply     |
-|  - Queue Manager       |                              |  - SHA-256 Hashing     |
-|  - Channel Monitor     |  <--- Execute Locally        |  - Prime Factorize     |
-|  - Decision Maker      |                              |  - Word Count          |
-|                        |  <--- Return Results ----    |  - File Analysis       |
-+------------------------+                              |  - Text Encryption     |
-   lyapunov_engine.py                                   |  - Number Sorting      |
-   demo.py                                              +------------------------+
-                                                           edge_server.py
+                          Multi-Edge Environment
+                    +-------------------------------+
++----------------+  |  +----------+  +-----------+  |
+|  IoT Device    |---->| Edge-1   |  | Edge-2    |  |
+|                |  |  | (Near)   |  | (Mid)     |  |
+|  RS-PLO Engine |  |  | 150m     |  | 600m      |  |
+|  Queue Manager |  |  | Port 9999|  | Port 10000|  |
+|  Multi-Edge DPP|  |  +----------+  +-----------+  |
+|                |  |                                |
+|  OR: Execute   |  |  +----------+                  |
+|  Locally       |  |  | Edge-3   |                  |
++----------------+  |  | (Far)    |                  |
+  lyapunov_engine   |  | 1200m    |                  |
+  demo.py           |  | Port 10001                  |
+  dashboard.py      |  +----------+                  |
+                    +-------------------------------+
+                          edge_server.py (x3)
 ```
 
-**Key point:** The edge server runs as a **separate process** on `127.0.0.1:9999`. Tasks are sent over **real TCP sockets** with a length-prefixed JSON protocol. This mirrors how real MEC offloading works.
+**Key points:**
+- **3 edge servers** at different distances (150m, 600m, 1200m) with varying compute power
+- Tasks sent over **real TCP sockets** with length-prefixed JSON protocol
+- The RS-PLO algorithm evaluates **4 options per task** (LOCAL + 3 edge servers)
+- A **live web dashboard** at `http://localhost:8080` shows real-time charts
 
 ---
 
@@ -87,13 +99,13 @@ The challenge: **wireless channels are unpredictable**. A good channel can sudde
               +--------- Cost Function ------+
                          |
                          v
-                   DECISION: LOCAL or OFFLOAD
-                   (pick the lower cost)
+                   DECISION: LOCAL or EDGE-1 or EDGE-2 or EDGE-3
+                   (pick the lowest cost among all 4 options)
 ```
 
 ### Mathematical Formulation
 
-**Per-slot optimization — minimize:**
+**Per-slot optimization -- minimize for each option x:**
 
 ```
 Cost(x) = Q(t) * [A(t) - u_x(t)]  +  V(t) * E_x(t)
@@ -105,22 +117,37 @@ Where:
 
 | Symbol | Description |
 |--------|-------------|
-| `Q(t)` | Physical queue backlog (bits) — how many tasks are waiting |
+| `Q(t)` | Physical queue backlog (bits) -- how many tasks are waiting |
 | `A(t)` | Task arrival (bits this slot) |
-| `u_x(t)` | Service rate — local CPU (10 MHz) or wireless TX rate |
+| `u_x(t)` | Service rate -- local CPU or wireless TX rate to server x |
 | `V(t)` | Adaptive control = `V_max * exp(-beta * Z(t))` |
-| `E_x(t)` | Energy cost of executing locally or offloading |
+| `E_x(t)` | Energy cost of executing on option x |
 | `Z(t)` | Volatility queue = `max(Z(t-1) - gamma, 0) + e(t)` |
 | `e(t)` | Channel prediction error (dB scale) |
 
-### Key Behavior
+---
 
-| Condition | Z(t) | V(t) | System Behavior |
-|-----------|:-----:|:-----:|-----------------|
-| Stable channel | Low | **High** | Energy penalty dominates, choose cheaper energy option |
-| Volatile channel | High | **Low** | Drift dominates, choose fastest service rate (clear queue) |
-| Full queue + good channel | High Q | Any | Offload to edge (higher service rate) |
-| Full queue + bad channel | High Q | Low | Execute locally (edge too slow over bad channel) |
+## Multi-Edge Server Selection
+
+The system evaluates **all options** per task and picks the minimum cost:
+
+| Option | Distance | Port | Compute | When Chosen |
+|--------|----------|------|:-------:|-------------|
+| LOCAL | -- | -- | 1x | Bad channel, high volatility |
+| Edge-1 (Near) | 150m | 9999 | 1.0x | Close range, standard tasks |
+| Edge-2 (Mid) | 600m | 10000 | 1.5x | Medium range, powerful CPU |
+| Edge-3 (Far) | 1200m | 10001 | 2.0x | Far range, GPU-class compute |
+
+Each server has different channel conditions based on distance, and the DPP cost function evaluates them all:
+
+```
+Cost_local  = Q_norm * drift_local  + V(t) * penalty_local
+Cost_edge1  = Q_norm * drift_edge1  + V(t) * penalty_edge1
+Cost_edge2  = Q_norm * drift_edge2  + V(t) * penalty_edge2
+Cost_edge3  = Q_norm * drift_edge3  + V(t) * penalty_edge3
+
+Decision = argmin(Cost_local, Cost_edge1, Cost_edge2, Cost_edge3)
+```
 
 ---
 
@@ -129,9 +156,14 @@ Where:
 ```
 FP/
 |-- edge_server.py          # TCP edge server - executes real computation tasks
-|-- lyapunov_engine.py      # RS-PLO algorithm engine + static baseline
-|-- demo.py                 # Live interactive CLI - process YOUR data in real-time
+|-- lyapunov_engine.py      # RS-PLO algorithm engine + multi-edge DPP + static baseline
+|-- demo.py                 # Multi-edge interactive CLI - process YOUR data in real-time
+|-- dashboard.py            # Live web dashboard backend (SSE + HTTP server)
+|-- dashboard.html          # Real-time Chart.js dashboard UI (dark theme)
 |-- run_experiment.py       # Automated experiment - RS-PLO vs Static comparison
+|-- test_engine.py          # Unit tests for engine logic
+|-- Dockerfile              # Docker containerization
+|-- docker-compose.yml      # Docker Compose for one-command setup
 |-- README.md               # This file
 |-- paper_text.txt          # Extracted paper text
 +-- results/                # Generated comparison plots
@@ -142,12 +174,15 @@ FP/
 
 ### File Details
 
-| File | Lines | Purpose |
-|------|------:|---------|
-| `edge_server.py` | ~300 | TCP server with 7 task handlers, threaded client connections |
-| `lyapunov_engine.py` | ~500 | RS-PLO + Static Lyapunov engines, channel model, mobility |
-| `demo.py` | ~430 | Interactive CLI with live RS-PLO decisions on real tasks |
-| `run_experiment.py` | ~350 | Orchestrates full experiment, generates Matplotlib plots |
+| File | Purpose |
+|------|---------|
+| `edge_server.py` | TCP server with 7 task handlers, threaded client connections |
+| `lyapunov_engine.py` | RS-PLO + Static Lyapunov engines, multi-edge DPP, channel model |
+| `demo.py` | Multi-edge interactive CLI with per-server history and colors |
+| `dashboard.py` | SSE backend + HTTP server for real-time browser dashboard |
+| `dashboard.html` | Chart.js animated charts, server cards, decision feed |
+| `run_experiment.py` | Orchestrates full experiment, generates Matplotlib plots |
+| `test_engine.py` | Unit tests validating engine, DPP decisions, multi-edge logic |
 
 ---
 
@@ -156,8 +191,8 @@ FP/
 ### Prerequisites
 
 - **Python 3.8+** (tested with 3.13.7)
-- **numpy** — numerical computation
-- **matplotlib** — plot generation (only for `run_experiment.py`)
+- **numpy** -- numerical computation
+- **matplotlib** -- plot generation (only for `run_experiment.py`)
 
 ### Setup
 
@@ -170,15 +205,41 @@ cd RS-PLO-Lyapunov-Based-Dynamic-Task-Offloading-in-Edge-Computing
 pip install numpy matplotlib
 ```
 
-No other setup needed. The edge server starts automatically.
+No other setup needed. Edge servers start automatically.
 
 ---
 
 ## Usage
 
-### 1. Live Interactive Demo (`demo.py`)
+### 1. Live Dashboard (`dashboard.py`)
 
-**This is the main way to use the system.** Start it and type commands in real-time:
+**The best way to demonstrate the system.** Starts a web dashboard with real-time charts:
+
+```bash
+python dashboard.py
+```
+
+Then open **http://localhost:8080** in your browser.
+
+**What you get:**
+- **Live stats** -- Tasks processed, Q(t), Z(t), V(t), offload ratio
+- **Server cards** -- LOCAL + 3 edge servers with task counts and percentages
+- **Animated charts** -- Q(t)/Z(t) and V(t)/Energy in real-time
+- **Decision feed** -- Color-coded scrolling log of every task decision
+- **CLI** -- Same interactive commands as `demo.py` in the terminal
+
+Type commands in the terminal while watching the dashboard update live:
+
+```
+rsplo> matrix 100          # Watch the chart update!
+rsplo> tunnel              # See volatility spike in the chart
+rsplo> burst               # Rapid-fire 5 tasks
+rsplo> servers             # View all 3 edge server signal quality
+```
+
+### 2. Interactive CLI Demo (`demo.py`)
+
+Terminal-only mode (no browser needed):
 
 ```bash
 python demo.py
@@ -206,7 +267,7 @@ rsplo> hashfile path/to/any/file     # SHA-256 hash any file
 ```
 rsplo> move close          # 100m from edge (excellent signal)
 rsplo> move far            # 2000m from edge (poor signal)
-rsplo> tunnel              # Enter tunnel (very weak signal)
+rsplo> tunnel              # Enter tunnel (very weak signal, Z spikes)
 rsplo> distance 500        # Set exact distance in meters
 ```
 
@@ -214,47 +275,50 @@ rsplo> distance 500        # Set exact distance in meters
 
 ```
 rsplo> status              # Show Q(t), Z(t), V(t), channel quality
+rsplo> servers             # Show all 3 edge servers + signal quality
 rsplo> burst               # Send 5 rapid tasks (stress test)
-rsplo> history             # Show full task execution log
+rsplo> history             # Show full task execution log with per-server breakdown
 rsplo> help                # List all commands
 rsplo> quit                # Exit
 ```
 
-#### Example Session
+#### Example Session (Multi-Edge)
 
 ```
 rsplo> matrix 100
   +--- Task #1: Matrix 100x100 ---
   |  Channel: -89.5dB | Distance: 300m | TX Rate: 27.2 Mbps
   |  Q=0 | Z=0.000 | V=10.0000
-  |  Decision: OFFLOAD -> Edge Server
-  |  Done! Executed on EDGE in 21.16ms
+  |  Decision: >> OFFLOAD -> Edge-1 (Near)
+  |  Done! Executed on Edge-1 (Near) in 18.13ms
 
 rsplo> tunnel
-  ENTERED TUNNEL - Very weak signal! Distance: 2400m
+  ENTERED TUNNEL -- Very weak signal! Distance: 2400m
 
-rsplo> encrypt Secret message
-  +--- Task #2: Encrypt text (14 chars) ---
-  |  Channel: -118.9dB | Distance: 2400m | TX Rate: 0.1 Mbps
-  |  Q=640,000 | Z=6.442 | V=0.0000
-  |  Decision: LOCAL -> This Device
-  |  Done! Executed on LOCAL in 0.00ms
+rsplo> matrix 100
+  +--- Task #2: Matrix 100x100 ---
+  |  Channel: -118.9dB | Distance: 2408m | TX Rate: 0.1 Mbps
+  |  Q=409,600 | Z=6.477 | V=0.0000
+  |  Decision: >> LOCAL -> This Device
+  |  Done! Executed on LOCAL in 2.02ms
 
 rsplo> move close
-  Moved CLOSE to edge server: 100m (excellent signal)
 
-rsplo> matrix 80
-  +--- Task #3: Matrix 80x80 ---
-  |  Channel: -84.1dB | Distance: 100m | TX Rate: 43.5 Mbps
-  |  Decision: OFFLOAD -> Edge Server
-  |  Done! Executed on EDGE in 1.14ms
+rsplo> burst
+  BURST MODE -- Sending 5 rapid tasks...
+  Task #3-7 all offloaded to Edge-1 (Near)
+
+rsplo> history
+  Total: 7 tasks
+    Edge-1 (Near): 6 (86%)
+    LOCAL: 1 (14%)
 ```
 
-Notice how the **same task type** gets different decisions based on channel conditions!
+Notice how the **same task type** gets different decisions based on channel conditions and server availability!
 
 ---
 
-### 2. Automated Experiment (`run_experiment.py`)
+### 3. Automated Experiment (`run_experiment.py`)
 
 Runs a full comparison between RS-PLO (adaptive) and Static Lyapunov (fixed V):
 
@@ -263,28 +327,28 @@ python run_experiment.py
 ```
 
 **What it does:**
-1. Starts the edge server
+1. Starts 3 edge servers (ports 9999, 10000, 10001)
 2. Runs RS-PLO with 5 users over 200 time slots
 3. Runs Static baseline with the same conditions
 4. Generates 3 comparison plots in `results/`
-5. Prints summary statistics
+5. Prints summary statistics with per-server breakdown
 
 **Output plots:**
 
 | Plot | Shows |
 |------|-------|
-| `01_rsplo_mechanism.png` | Q(t), Z(t), V(t) over time - the adaptive mechanism |
+| `01_rsplo_mechanism.png` | Q(t), Z(t), V(t) over time -- the adaptive mechanism |
 | `02_comparison.png` | RS-PLO vs Static: queue, energy, offload pattern, latency |
 | `03_summary.png` | Per-user comparison and overall metrics |
 
 ---
 
-### 3. Standalone Edge Server
+### 4. Standalone Edge Server
 
-You can run the edge server independently and send tasks from your own code:
+Run the edge server independently:
 
 ```bash
-# Terminal 1: Start the server
+# Terminal 1: Start a server on port 9999
 python edge_server.py 9999
 ```
 
@@ -313,7 +377,7 @@ sock.close()
 ## Supported Task Types
 
 | Task Type | Command | What It Computes | Data Size |
-|-----------|---------|-----------------|-----------|
+|-----------|---------|-----------------|-----------| 
 | `matrix_multiply` | `matrix N` | NxN matrix multiplication (real NumPy dot) | N^2 x 64 bits |
 | `hash_data` | `hash KB` | SHA-256 with 100 chained rounds | KB x 8000 bits |
 | `prime_factorize` | `prime N` | Trial-division prime factorization | ~20K bits |
@@ -322,13 +386,13 @@ sock.close()
 | `word_count` | `file path` | Word/line/char count + frequency | file size |
 | `file_stats` | `file path` | Shannon entropy + pattern analysis | file size |
 
-All tasks are **real computation** — actual matrix products, actual hashing, actual factorization.
+All tasks are **real computation** -- actual matrix products, actual hashing, actual factorization.
 
 ---
 
 ## System Parameters
 
-Configurable in `lyapunov_engine.py` (`SystemParams` class) or in `run_experiment.py`:
+Configurable in `lyapunov_engine.py` (`SystemParams` class):
 
 ### Algorithm Parameters
 
@@ -337,6 +401,15 @@ Configurable in `lyapunov_engine.py` (`SystemParams` class) or in `run_experimen
 | `V_max` | 10.0 | Maximum control parameter (energy weight when stable) |
 | `beta` | 2.0 | Sensitivity of V(t) to volatility (higher = faster response) |
 | `gamma` | 0.2 | Volatility queue decay rate (lower = longer memory of risk) |
+
+### Edge Server Configuration
+
+| Parameter | Default | Description |
+|-----------|:-------:|-------------|
+| `edge_servers` | 3 servers | List of `EdgeServerConfig` objects |
+| `distance` | 150/600/1200m | Distance to each edge server |
+| `compute_multiplier` | 1.0/1.5/2.0x | Server compute capability |
+| `port` | 9999/10000/10001 | TCP port for each server |
 
 ### Device Parameters
 
@@ -400,28 +473,26 @@ V(t):     10.0  9.8  9.6   |   0.0  0.0  0.0   |   0.0   0.0
 Mode:     Energy-optimize   |   Queue-stabilize  |   Recovering
 ```
 
-When Z(t) is high, V(t) drops to near-zero, making the system ignore energy costs and focus purely on clearing the queue as fast as possible.
-
 ---
 
 ## How the Decision Works
 
-For each incoming task, the algorithm computes:
+For each incoming task, the algorithm computes costs for **all 4 options**:
 
 ```
 Cost_local   = Q_norm x drift_local   + V(t) x penalty_local
-Cost_offload = Q_norm x drift_offload + V(t) x penalty_offload
+Cost_edge1   = Q_norm x drift_edge1   + V(t) x penalty_edge1
+Cost_edge2   = Q_norm x drift_edge2   + V(t) x penalty_edge2
+Cost_edge3   = Q_norm x drift_edge3   + V(t) x penalty_edge3
 ```
 
-**Pick the option with lower cost.**
+**Pick the option with the lowest cost.**
 
-The drift captures **queue pressure** (how fast each option clears the queue), and the penalty captures **energy cost**. V(t) controls the balance:
+The drift captures **queue pressure**, the penalty captures **energy cost**, and V(t) controls the balance:
 
-- **V = 10** (stable): Energy matters a lot - pick the cheaper option
-- **V = 0** (volatile): Energy does not matter - pick the fastest option
-- **Large Q**: Queue pressure dominates regardless - drain the queue
-
-This creates an **intelligent, adaptive** offloading policy that responds to real-time conditions — exactly what the paper proposes.
+- **V = 10** (stable): Energy matters a lot -- pick the cheapest option
+- **V = 0** (volatile): Energy is irrelevant -- pick the fastest option
+- **Large Q**: Queue pressure dominates -- drain the queue ASAP
 
 ---
 
@@ -429,6 +500,7 @@ This creates an **intelligent, adaptive** offloading policy that responds to rea
 
 ### Channel Model
 - Path loss: `h(d) = h0 * d^(-alpha)` with Rayleigh fading
+- Per-server channel: `h_server(d) = h0 * |d - d_server|^(-alpha)`
 - Shannon capacity: `R = B * log2(1 + P*h/N0)`
 - Prediction error computed in **dB scale** for meaningful volatility tracking
 
@@ -437,10 +509,37 @@ This creates an **intelligent, adaptive** offloading policy that responds to rea
 - Threaded server handles multiple concurrent clients
 - Automatic fallback to local execution if edge connection fails
 
+### Dashboard Architecture
+- Python `http.server` serves `dashboard.html` on port 8080
+- **Server-Sent Events (SSE)** push real-time data to the browser
+- Zero external dependencies (no WebSockets library needed)
+- Chart.js for animated, responsive charts
+
 ### Energy Model
 - Local: `E_local = energy_per_bit * task_bits` (slow CPU = more energy per bit)
-- Offload: `E_offload = P_tx * (task_bits / R)` (depends on channel quality)
+- Offload: `E_offload = P_tx * (task_bits / R)` (depends on channel to specific server)
 - When channel is good: offload is cheaper. When bad: local is cheaper.
+
+---
+
+## Docker
+
+Run the entire system with one command:
+
+```bash
+# Build and run
+docker-compose up --build
+
+# Open dashboard
+open http://localhost:8080
+```
+
+Or manually:
+
+```bash
+docker build -t rsplo .
+docker run -it -p 8080:8080 rsplo
+```
 
 ---
 

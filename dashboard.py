@@ -6,6 +6,8 @@ Starts:
   2. SSE endpoint on /events for real-time data push
   3. 3 Edge servers (9999, 10000, 10001)
   4. Interactive CLI (same as demo.py)
+  5. Auto-run endpoint for browser-controlled task submission
+  6. Distance slider endpoint for browser-controlled mobility
 
 Open http://localhost:8080 in your browser to see live charts!
 
@@ -20,6 +22,8 @@ import time
 import sys
 import os
 import queue
+import random
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from demo import LiveDemo, C
@@ -59,21 +63,26 @@ class SSEManager:
 
 
 sse_manager = SSEManager()
+demo_instance = None  # Set in main()
 
 
 # ─────────────────────────────────────────────
-#  HTTP Request Handler (serves HTML + SSE)
+#  HTTP Request Handler
 # ─────────────────────────────────────────────
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
-    """Custom HTTP handler that serves the dashboard and SSE events."""
+    """Custom HTTP handler: dashboard HTML, SSE events, auto-run, distance slider."""
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        query = urllib.parse.parse_qs(parsed.query)
+
+        if path == "/" or path == "/index.html":
             self.path = "/dashboard.html"
             return super().do_GET()
 
-        elif self.path == "/events":
+        elif path == "/events":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
@@ -85,17 +94,14 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             sse_manager.add_client(client_queue)
 
             try:
-                # Send initial state
                 self.wfile.write(b"event: connected\ndata: {\"status\": \"ok\"}\n\n")
                 self.wfile.flush()
-
                 while True:
                     try:
                         message = client_queue.get(timeout=15)
                         self.wfile.write(message.encode())
                         self.wfile.flush()
                     except queue.Empty:
-                        # Send keepalive
                         self.wfile.write(b": keepalive\n\n")
                         self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
@@ -104,8 +110,56 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 sse_manager.remove_client(client_queue)
             return
 
+        elif path == "/auto_task":
+            # Browser auto-run: pick a random task and execute
+            self._send_json({"status": "queued"})
+            if demo_instance:
+                threading.Thread(target=self._run_random_task, daemon=True).start()
+            return
+
+        elif path == "/set_distance":
+            # Browser distance slider
+            d = query.get("d", ["300"])[0]
+            try:
+                d = float(d)
+                d = max(30, min(2500, d))
+                if demo_instance:
+                    demo_instance.user.distance = d
+                self._send_json({"status": "ok", "distance": d})
+            except ValueError:
+                self._send_json({"status": "error"})
+            return
+
         else:
             return super().do_GET()
+
+    def _send_json(self, data):
+        response = json.dumps(data).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", len(response))
+        self.end_headers()
+        self.wfile.write(response)
+
+    def _run_random_task(self):
+        """Execute a random task (called from auto-run)."""
+        if not demo_instance:
+            return
+        tasks = [
+            ("matrix", "60"),
+            ("matrix", "80"),
+            ("matrix", "100"),
+            ("hash", "100"),
+            ("hash", "200"),
+            ("prime", "9999991"),
+            ("prime", "999983"),
+            ("sort", "10000"),
+            ("sort", "50000"),
+            ("encrypt", "Auto-run task from dashboard"),
+        ]
+        cmd, arg = random.choice(tasks)
+        demo_instance.handle_command(f"{cmd} {arg}")
 
     def log_message(self, format, *args):
         pass  # Suppress HTTP logs
@@ -133,6 +187,8 @@ def start_http_server(port=8080):
 # ─────────────────────────────────────────────
 
 def main():
+    global demo_instance
+
     print(f"""
 {C.BOLD}{C.CYAN}{'='*70}{C.RESET}
 {C.BOLD}{C.WHITE}  RS-PLO LIVE DASHBOARD — Real-Time Multi-Edge Visualization{C.RESET}
@@ -148,11 +204,11 @@ def main():
 
     # Create the demo engine
     demo = LiveDemo()
+    demo_instance = demo
 
     # Hook into task completion to broadcast SSE events
     def on_task_complete(task_entry):
         sse_manager.broadcast("task", task_entry)
-        # Also send current state
         state = {
             "Q": demo.user.Q,
             "Z": demo.user.Z,
@@ -168,27 +224,21 @@ def main():
     demo.start_servers()
     demo.show_banner()
 
-    # Send initial server info to dashboard
+    # Send initial server info
     servers_info = []
     for server in demo.params.edge_servers:
         servers_info.append({
-            "name": server.name,
-            "port": server.port,
+            "name": server.name, "port": server.port,
             "distance": server.distance,
             "compute_multiplier": server.compute_multiplier,
             "description": server.description,
         })
 
-    # Delay to let browser connect, then send
     def send_init():
         time.sleep(2)
         sse_manager.broadcast("init", {
             "servers": servers_info,
-            "params": {
-                "V_max": demo.params.V_max,
-                "beta": demo.params.beta,
-                "gamma": demo.params.gamma,
-            }
+            "params": { "V_max": demo.params.V_max, "beta": demo.params.beta, "gamma": demo.params.gamma }
         })
     threading.Thread(target=send_init, daemon=True).start()
 
@@ -197,6 +247,7 @@ def main():
 
     print(f"{C.GREEN}  Ready! Type a command (or 'help'):{C.RESET}")
     print(f"{C.DIM}  Dashboard: http://localhost:{http_port}{C.RESET}")
+    print(f"{C.DIM}  Auto-Run can be toggled from the dashboard{C.RESET}")
     print()
 
     running = True
